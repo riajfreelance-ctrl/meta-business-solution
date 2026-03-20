@@ -50,3 +50,13 @@ Go to both `client` and `server` folders and run:
 npm run dev
 ```
 - Open [http://localhost:5173/](http://localhost:5173/) in your browser.
+
+---
+## 🛡️ Backup & Security Recommendations (USER action required)
+
+The following files are **EXCLUDED** from GitHub for security. You should back them up personally:
+1. **`.env` Files:** Contains your Gemini API key and Firebase credentials. (Located in `/client` and `/server`).
+2. **`firebase-service-account.json`:** Your private key for Firebase Admin. (Located in `/server`).
+3. **GitHub Token:** The Personal Access Token (PAT) used for auto-sync.
+
+**Recommendation:** Save these keys in a secure Password Manager or a private, encrypted note.
