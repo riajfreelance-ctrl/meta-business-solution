@@ -1,7 +1,7 @@
 {
-  "name": "messenger-ai-chatbot-server",
+  "name": "meta-solution-server",
   "version": "1.0.0",
-  "description": "Facebook Messenger AI Chatbot Backend",
+  "description": "Meta Business Solution AI Chatbot Backend",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
