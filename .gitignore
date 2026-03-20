@@ -4,3 +4,5 @@ node_modules/
 dist/
 build/
 *.log
+PRIVATE_KEYS_DO_NOT_SHARE.txt
+PRIVATE_CREDENTIALS.txt
