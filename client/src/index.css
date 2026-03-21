@@ -3,9 +3,9 @@
 @tailwind utilities;
 
 :root {
-  --glass-bg: rgba(255, 255, 255, 0.05);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-blur: blur(12px);
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.05);
+  --glass-blur: blur(20px);
 }
 
 body {
@@ -21,7 +21,8 @@ body {
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
-  border-radius: 1rem;
+  border-radius: 2rem;
+  box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.5);
 }
 
 .glass-input {
@@ -58,4 +59,126 @@ body {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.glass-glow-button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.glass-glow-button::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.1) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.glass-glow-button:hover::after {
+  opacity: 1;
+}
+
+/* --- Responsive & UI Fixes --- */
+
+/* Mobile & Tablet Adjustments */
+@media (max-width: 1200px) {
+  .lg\:col-span-2 {
+    grid-column: span 1 / span 1 !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  /* Inbox Layout on Tablets */
+  .flex.h-\[calc\(100vh-180px\)\] {
+    flex-direction: column !important;
+    height: auto !important;
+    min-height: 100vh;
+  }
+
+  .w-96, .w-80 {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Prevent sidebars from taking space on small screens if not intended */
+  .lg\:block {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  body {
+    background: #020617; /* Solid dark for mobile performance */
+  }
+
+  main {
+    padding: 1rem !important;
+  }
+
+  header {
+    margin-bottom: 1.5rem !important;
+  }
+
+  .text-3xl {
+    font-size: 1.5rem !important;
+  }
+
+  .text-4xl {
+    font-size: 1.75rem !important;
+  }
+
+  /* Chat Window fixes */
+  .p-6 {
+    padding: 1rem !important;
+  }
+
+  .rounded-3xl {
+    border-radius: 1.5rem !important;
+  }
+
+  /* Inbox list items */
+  .p-4 {
+    padding: 0.75rem !important;
+  }
+}
+
+/* Scrollbar Utilities */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(14, 165, 233, 0.2);
 }
