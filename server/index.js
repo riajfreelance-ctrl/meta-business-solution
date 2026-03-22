@@ -12,11 +12,10 @@ require('dotenv').config();
 const app = express().use(cors({ origin: '*' })).use(bodyParser.json());
 
 // --- DEBUG LOGGING ---
-const logFile = path.join(__dirname, 'server_debug.log');
 function serverLog(msg) {
-  const line = `[${new Date().toISOString()}] ${msg}\n`;
-  console.log(line.trim());
-  fs.appendFileSync(logFile, line);
+  const line = `[${new Date().toISOString()}] ${msg}`;
+  console.log(line);
+  // Disabled fs.appendFileSync for Vercel (read-only filesystem)
 }
 
 // --- CONFIG ---
@@ -307,6 +306,12 @@ app.post('/api/discover_gaps', async (req, res) => {
   }
 });
 
+
 app.get('/', (req, res) => res.send('Server Alive'));
 
-app.listen(process.env.PORT || 3000, () => serverLog('Server Running on Port 3000'));
+// Export for Vercel Serverless Functions
+module.exports = app;
+
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(process.env.PORT || 3000, () => serverLog('Server Running on Port 3000'));
+}
