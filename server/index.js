@@ -307,6 +307,7 @@ app.post('/api/discover_gaps', async (req, res) => {
 });
 
 
+app.get('/api', (req, res) => res.json({ status: 'API Alive', version: '1.0.0' }));
 app.get('/', (req, res) => res.send('Server Alive'));
 
 // Export for Vercel Serverless Functions
