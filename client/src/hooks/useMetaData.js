@@ -7,6 +7,7 @@ export const useMetaData = () => {
   const [drafts, setDrafts] = useState([]);
   const [library, setLibrary] = useState([]);
   const [products, setProducts] = useState([]);
+  const [conversations, setConversations] = useState([]);
 
   useEffect(() => {
     return onSnapshot(collection(db, "knowledge_gaps"), (snapshot) => {
@@ -32,5 +33,11 @@ export const useMetaData = () => {
     });
   }, []);
 
-  return { gaps, drafts, library, products };
+  useEffect(() => {
+    return onSnapshot(collection(db, "conversations"), (snapshot) => {
+      setConversations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+  }, []);
+
+  return { gaps, drafts, library, products, conversations };
 };

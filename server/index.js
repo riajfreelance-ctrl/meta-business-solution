@@ -211,8 +211,27 @@ async function handleMessage(sender_psid, message) {
 
 async function handleGeminiAI(sender_psid, text) {
   try {
-    const chat = model.startChat({ history: [] });
-    const result = await chat.sendMessage(text);
+    // Fetch Brand Persona from Firestore
+    let personaStr = "";
+    try {
+      const blueprintDoc = await getDocs(query(collection(db, "settings"), where("__name__", "==", "blueprint")));
+      if (!blueprintDoc.empty) {
+        const data = blueprintDoc.docs[0].data();
+        personaStr = `Tone: ${data.tone || 'Friendly'}. Signature Emojis: ${data.emojis || '✨'}. `;
+      }
+    } catch (err) {
+      serverLog("Error fetching persona: " + err.message);
+    }
+
+    const chat = model.startChat({ 
+      history: [],
+      generationConfig: {
+        maxOutputTokens: 200,
+      }
+    });
+
+    const fullPrompt = `${personaStr}User says: "${text}"`;
+    const result = await chat.sendMessage(fullPrompt);
     const responseText = result.response.text();
     
     callSendAPI(sender_psid, { "text": responseText });

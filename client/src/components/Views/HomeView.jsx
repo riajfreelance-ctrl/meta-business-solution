@@ -2,16 +2,16 @@ import React from 'react';
 import { MessageSquare, User, Zap, TrendingUp, Edit2 } from 'lucide-react';
 import StatCard from '../StatCard';
 
-const HomeView = ({ isDarkMode, t, language, theme }) => {
+const HomeView = ({ isDarkMode, t, language, theme, stats }) => {
   return (
     <div className="animate-fade-in space-y-8">
       <h1 className="text-4xl font-black tracking-tight uppercase">{t('welcome')}</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard icon={MessageSquare} title="Total Messages" value="1,284" color="#3B82F6" trend={12} trendLabel="+12% this week" isDarkMode={isDarkMode} theme={theme} />
-        <StatCard icon={User} title="New Leads" value="48" color="#10B981" trend={5} trendLabel="+5 Today" isDarkMode={isDarkMode} theme={theme} />
-        <StatCard icon={Zap} title="AI Automation" value="94%" color="#8B5CF6" trend={2} trendLabel="Stable" isDarkMode={isDarkMode} theme={theme} />
-        <StatCard icon={TrendingUp} title="Conversion" value="3.2%" color="#F59E0B" trend={-1} trendLabel="-1% drop" isDarkMode={isDarkMode} theme={theme} />
+        <StatCard icon={MessageSquare} title="Total Messages" value={stats?.totalMessages?.toLocaleString() || "0"} color="#3B82F6" trend={12} trendLabel="+12% this week" isDarkMode={isDarkMode} theme={theme} />
+        <StatCard icon={User} title="New Leads" value={stats?.newLeads?.toString() || "0"} color="#10B981" trend={5} trendLabel="+5 Today" isDarkMode={isDarkMode} theme={theme} />
+        <StatCard icon={Zap} title="AI Automation" value={`${stats?.automationScore || 92}%`} color="#8B5CF6" trend={2} trendLabel="Stable" isDarkMode={isDarkMode} theme={theme} />
+        <StatCard icon={TrendingUp} title="Conversion" value={`${stats?.conversion || 3.2}%`} color="#F59E0B" trend={-1} trendLabel="-1% drop" isDarkMode={isDarkMode} theme={theme} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

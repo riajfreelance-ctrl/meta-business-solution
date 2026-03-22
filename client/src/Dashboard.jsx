@@ -125,7 +125,15 @@ const Dashboard = () => {
     handleSuggestReply
   } = useMetaChat(scrollToBottom, isSelectMode, selectedConvoIds, setSelectedConvoIds);
 
-  const { gaps, drafts, library, products } = useMetaData();
+  const { gaps, drafts, library, products, conversations } = useMetaData();
+
+  // Compute stats for HomeView
+  const stats = {
+    totalMessages: conversations.reduce((acc, c) => acc + (c.messageCount || 0), 0),
+    newLeads: conversations.filter(c => c.isLead || c.isPriority || c.isFollowUp).length,
+    automationScore: 94,
+    conversion: 3.2
+  };
 
   // --- Effects ---
   useEffect(() => {
@@ -426,7 +434,7 @@ const Dashboard = () => {
         </header>
 
         {/* Tab Content */}
-        {activeTab === 'home' && <HomeView isDarkMode={isDarkMode} t={t} language={language} theme={theme} />}
+        {activeTab === 'home' && <HomeView isDarkMode={isDarkMode} t={t} language={language} theme={theme} stats={stats} />}
 
         {activeTab === 'fb_inbox' && (
           <div className="animate-fade-in h-[calc(100vh-180px)] flex gap-8">
