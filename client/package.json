@@ -19,6 +19,9 @@
     "clsx": "^2.0.0",
     "tailwind-merge": "^2.1.0"
   },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "*"
+  },
   "devDependencies": {
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
