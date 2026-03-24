@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 import { db } from '../firebase-client';
 import { 
   collection, 
@@ -8,10 +9,13 @@ import {
   doc, 
   updateDoc, 
   addDoc, 
-  serverTimestamp 
+  serverTimestamp,
+  where
 } from 'firebase/firestore';
+import { useBrand } from '../context/BrandContext';
 
 export const useMetaChat = (scrollToBottom, isSelectMode, selectedConvoIds, setSelectedConvoIds) => {
+  const { activeBrandId } = useBrand();
   const [conversations, setConversations] = useState([]);
   const [selectedConvo, setSelectedConvo] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
@@ -21,12 +25,17 @@ export const useMetaChat = (scrollToBottom, isSelectMode, selectedConvoIds, setS
 
   // Conversations Listener
   useEffect(() => {
-    const q = query(collection(db, "conversations"), orderBy("timestamp", "desc"));
+    if (!activeBrandId) return;
+    const q = query(
+      collection(db, "conversations"), 
+      where("brandId", "==", activeBrandId),
+      orderBy("timestamp", "desc")
+    );
     return onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setConversations(data);
     });
-  }, []);
+  }, [activeBrandId]);
 
   // Messages Listener
   useEffect(() => {
@@ -60,20 +69,30 @@ export const useMetaChat = (scrollToBottom, isSelectMode, selectedConvoIds, setS
   };
 
   const handleSendMessage = async () => {
-    if (!messageInput.trim() || !selectedConvo) return;
+    if (!messageInput.trim() || !selectedConvo || !activeBrandId) return;
     const text = messageInput;
     setMessageInput('');
     
     try {
+      // 1. Persist to local Firestore for immediate UI update
       await addDoc(collection(db, `conversations/${selectedConvo.id}/messages`), {
         text,
         type: 'sent',
+        brandId: activeBrandId,
         timestamp: serverTimestamp(),
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       });
       await updateDoc(doc(db, "conversations", selectedConvo.id), {
         lastMessage: text,
+        brandId: activeBrandId,
         timestamp: serverTimestamp()
+      });
+
+      // 2. Call Backend to Send to Facebook
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/messages/send`, {
+        psid: selectedConvo.id,
+        text,
+        brandId: activeBrandId
       });
     } catch (e) { 
       console.error("Error sending message:", e); 

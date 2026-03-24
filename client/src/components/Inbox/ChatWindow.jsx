@@ -1,18 +1,21 @@
 import React from 'react';
-import { RotateCcw, AlertCircle, Bookmark, Star, ChevronDown, Zap, Plus, ChevronRight, Package, XCircle, MessageSquare } from 'lucide-react';
+import { RotateCcw, AlertCircle, Bookmark, Star, ChevronDown, Zap, Plus, ChevronRight, Package, XCircle, MessageSquare, ShoppingBag } from 'lucide-react';
 
 const ChatWindow = ({ 
   isDarkMode, t, selectedConvo, chatMessages, handleSuggestReply, handleSendMessage, 
   isAiThinking, messageInput, setMessageInput, attachedFiles, 
   setAttachedFiles, handleFileChange, togglePriority, toggleFollowUp,
-  isSyncingHistory, syncHistory, chatEndRef, onScroll, showScrollButton, scrollToBottom
+  isSyncingHistory, syncHistory, chatEndRef, onScroll, showScrollButton, scrollToBottom,
+  onOpenOrderDrafting, onOpenCatalogShare
 }) => (
-  <div className={`flex-1 flex flex-col rounded-3xl border overflow-hidden relative ${
-    isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white border-black/5 shadow-xl'
+  <div className={`flex-1 flex flex-col overflow-hidden relative glass transition-all duration-700 ${
+    isDarkMode ? 'bg-[#020617]/20' : 'bg-gray-50/50'
   }`}>
     {selectedConvo ? (
       <>
-        <div className={`p-4 border-b flex items-center justify-between ${isDarkMode ? 'border-white/10' : 'border-black/5'}`}>
+         <div className={`p-4 border-b flex items-center justify-between backdrop-blur-3xl sticky top-0 z-20 ${
+           isDarkMode ? 'bg-[#020617]/40 border-white/10' : 'bg-white/60 border-black/5'
+         }`}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-prime-500/20 flex items-center justify-center text-prime-500 font-bold">
               {selectedConvo.customerName?.[0]}
@@ -46,6 +49,26 @@ const ChatWindow = ({
               </div>
             )}
             <button 
+              onClick={onOpenOrderDrafting}
+              className={`p-2 rounded-xl transition-all flex items-center gap-2 ${
+                isDarkMode ? 'bg-prime-500/10 text-prime-400 hover:bg-prime-500/20' : 'bg-prime-50 text-prime-600 hover:bg-prime-100'
+              }`}
+              title="Draft Order"
+            >
+              <ShoppingBag size={20} />
+              <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Draft Order</span>
+            </button>
+            <button 
+              onClick={onOpenCatalogShare}
+              className={`p-2 rounded-xl transition-all flex items-center gap-2 ${
+                isDarkMode ? 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+              }`}
+              title="Share Catalog"
+            >
+              <Package size={20} />
+              <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Catalog</span>
+            </button>
+            <button 
               onClick={() => toggleFollowUp(selectedConvo.id)}
               className={`p-2 rounded-xl transition-all ${
                 selectedConvo.isFollowUp ? 'bg-prime-500/10 text-prime-500' : 'text-gray-400 hover:bg-white/5'
@@ -77,11 +100,11 @@ const ChatWindow = ({
            )}
            {chatMessages?.map((msg, i) => (
              <div key={i} className={`flex flex-col gap-1 ${msg.type === 'sent' ? 'items-end' : 'max-w-[80%]'}`}>
-                <div className={`p-4 rounded-2xl text-sm ${
-                  msg.type === 'sent' 
-                    ? 'bg-prime-500 text-white shadow-lg' 
-                    : (isDarkMode ? 'bg-white/10 text-white' : 'bg-gray-100 text-gray-900')
-                }`}>
+                 <div className={`p-4 rounded-3xl text-sm transition-all duration-500 hover:shadow-xl ${
+                   msg.type === 'sent' 
+                     ? (isDarkMode ? 'bg-gradient-to-br from-prime-600 to-purple-700 text-white shadow-lg shadow-prime-500/10' : 'bg-prime-600 text-white shadow-lg shadow-prime-500/20')
+                     : (isDarkMode ? 'bg-white/10 text-white border border-white/5 backdrop-blur-md' : 'bg-white text-gray-900 border border-black/5 shadow-sm')
+                 }`}>
                   {msg.text}
                       {msg.attachments && msg.attachments.length > 0 && (
                         <div className="mt-3 space-y-2">
@@ -120,7 +143,7 @@ const ChatWindow = ({
             </div>
         <div className={`p-4 border-t ${isDarkMode ? 'border-white/10' : 'border-black/5'}`}>
           <div className="relative group/input">
-            <div className={`absolute -top-14 left-0 w-full flex justify-center transition-all pb-4 ${isAiThinking ? 'opacity-100 pointer-events-auto' : 'opacity-0 group-hover/input:opacity-100 pointer-events-none group-hover/input:pointer-events-auto'}`}>
+            <div className={`absolute -top-14 left-0 w-full flex justify-center transition-all pb-14 ${isAiThinking ? 'opacity-100 pointer-events-auto' : 'opacity-0 group-hover/input:opacity-100 pointer-events-none group-hover/input:pointer-events-auto'}`}>
               <button 
                 onClick={handleSuggestReply}
                 disabled={isAiThinking}
@@ -159,8 +182,8 @@ const ChatWindow = ({
                 value={messageInput}
                 onChange={(e) => setMessageInput(e.target.value)}
                 placeholder="Type a message..."
-                rows={Math.min(messageInput.split('\n').length, 5)}
-                className="flex-1 bg-transparent border-none outline-none px-2 py-2 text-sm resize-none scrollbar-none"
+                rows={Math.max(1, Math.min(messageInput.split('\n').length, 8))}
+                className="flex-1 bg-transparent border-none outline-none px-2 py-3 text-sm resize-none overflow-y-auto min-h-[50px] leading-relaxed"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();

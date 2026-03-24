@@ -21,7 +21,7 @@ import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import ConfirmModal from '../Shared/ConfirmModal';
 
 const TrainingRow = ({ gap, isDarkMode, handleConvertToDraft, onDelete }) => {
-  const [reply, setReply] = useState("");
+  const [reply, setReply] = useState(gap?.suggestedAnswer || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isEditingQuestion, setIsEditingQuestion] = useState(false);
   const [editedQuestion, setEditedQuestion] = useState(gap?.question || "");
@@ -64,9 +64,14 @@ const TrainingRow = ({ gap, isDarkMode, handleConvertToDraft, onDelete }) => {
                   <Edit3 size={10} className="text-prime-400 opacity-0 group-hover/q:opacity-100 transition-all" />
                </div>
             )}
-            <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">
-               {gap.category || 'Customer Query'}
-            </span>
+            <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                {gap.category || 'Customer Query'}
+                {gap.type === 'auto_learned' && (
+                  <span className="bg-prime-500/10 text-prime-400 px-1.5 py-0.5 rounded border border-prime-500/20 text-[7px]">
+                    Auto-Learned
+                  </span>
+                )}
+             </span>
          </div>
       </td>
       <td className="p-5 align-top min-w-[300px]">
@@ -94,7 +99,9 @@ const TrainingRow = ({ gap, isDarkMode, handleConvertToDraft, onDelete }) => {
             
             {/* Suggestions Chips */}
             {gap.suggestions && gap.suggestions.length > 0 && (
-               <div className="flex flex-wrap gap-1.5">
+               <div className="space-y-1">
+                 <p className="text-[8px] font-black uppercase text-gray-500 tracking-widest opacity-50 pl-1">Also covers these questions:</p>
+                 <div className="flex flex-wrap gap-1.5">
                   {gap.suggestions.map((suggestion, i) => (
                      <button 
                         key={i}
@@ -108,6 +115,7 @@ const TrainingRow = ({ gap, isDarkMode, handleConvertToDraft, onDelete }) => {
                         {suggestion}
                      </button>
                   ))}
+               </div>
                </div>
             )}
          </div>

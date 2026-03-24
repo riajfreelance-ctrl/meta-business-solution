@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if document belongs to brand
+    function belongsToBrand(brandId) {
+      return request.auth != null || // For now, allowing all auth, but typically we check token.brandId
+             request.resource.data.brandId == brandId ||
+             resource.data.brandId == brandId;
+    }
+
+    match /brands/{brandId} {
+      allow read, write: if true; // In production, restrict to system admins
+    }
+
+    match /products/{productId} {
+      allow read: if true; // Publicly readable for catalog/chat
+      allow write: if belongsToBrand(request.resource.data.brandId);
+    }
+
+    match /conversations/{convoId} {
+      allow read, write: if true; // Restricted by brandId in queries
+      
+      match /messages/{msgId} {
+        allow read, write: if true;
+      }
+    }
+
+    match /knowledge_base/{kbId} {
+      allow read: if true;
+      allow write: if belongsToBrand(request.resource.data.brandId);
+    }
+
+    match /draft_replies/{draftId} {
+      allow read, write: if belongsToBrand(request.resource.data.brandId || resource.data.brandId);
+    }
+
+    match /knowledge_gaps/{gapId} {
+      allow read, write: if belongsToBrand(request.resource.data.brandId || resource.data.brandId);
+    }
+
+    match /draft_orders/{orderId} {
+      allow read, write: if belongsToBrand(request.resource.data.brandId || resource.data.brandId);
+    }
+    
+    match /logs/{logId} {
+      allow create: if true;
+      allow read: if belongsToBrand(resource.data.brandId);
+    }
+  }
+}

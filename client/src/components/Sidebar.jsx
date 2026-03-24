@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { GripVertical, ChevronDown, ChevronRight, Zap } from 'lucide-react';
+import { GripVertical, ChevronDown, ChevronRight, Zap, Building2, Store } from 'lucide-react';
 import { MetaIcon } from './Icons';
+import { useBrand } from '../context/BrandContext';
 
 const Tooltip = ({ text, show, top }) => {
   if (!show) return null;
@@ -114,7 +115,6 @@ const MagneticButton = ({ children, onClick, isActive, isDarkMode, className, is
     </div>
   );
 };
-
 const Sidebar = ({ 
   mainNav, 
   activeTab, 
@@ -129,9 +129,12 @@ const Sidebar = ({
   handleDragStart,
   handleDragOver,
   handleDragEnd,
-  handleDrop
+  handleDrop,
+  brandData
 }) => {
+  const { brands, activeBrandId, setActiveBrandId } = useBrand();
   const [popoverData, setPopoverData] = useState({ show: false, item: null, top: 0, type: null });
+  const [isBrandSwitcherOpen, setIsBrandSwitcherOpen] = useState(false);
 
   const toggleMenu = (menuId) => {
     if (isSidebarCollapsed) {
@@ -156,29 +159,76 @@ const Sidebar = ({
         {/* Decorative Background Elements */}
         <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-prime-500/5 to-transparent pointer-events-none" />
         
-        {/* Brand Logo - NOW THE TOGGLE */}
-        <button 
-          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className={`flex flex-col items-center mb-12 relative z-10 pt-4 transition-all duration-500 hover:scale-105 active:scale-95 cursor-pointer ${isSidebarCollapsed ? 'scale-75' : ''}`}
-        >
-          <div className="relative group/logo mb-4">
-            <div className="absolute -inset-4 bg-prime-500 rounded-full blur-3xl opacity-20 group-hover/logo:opacity-40 transition-opacity duration-1000" />
-            <div className={`relative p-4 rounded-3xl border transition-all duration-500 group-hover/logo:rotate-6 ${
-              isDarkMode ? 'bg-white/5 border-white/10 shadow-2xl shadow-prime-500/20' : 'bg-white border-black/5 shadow-xl'
-            }`}>
-              <MetaIcon size={isSidebarCollapsed ? 24 : 40} />
+        {/* Brand Logo & Switcher */}
+        <div className="mb-12 relative z-20">
+          <button 
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className={`flex flex-col items-center w-full pt-4 transition-all duration-500 hover:scale-105 active:scale-95 cursor-pointer ${isSidebarCollapsed ? 'scale-75' : ''}`}
+          >
+            <div className="relative group/logo mb-4">
+              <div className="absolute -inset-4 bg-prime-500 rounded-full blur-3xl opacity-20 group-hover/logo:opacity-40 transition-opacity duration-1000" />
+              <div className={`relative p-4 rounded-3xl border transition-all duration-500 group-hover/logo:rotate-6 ${
+                isDarkMode ? 'bg-white/5 border-white/10 shadow-2xl shadow-prime-500/20' : 'bg-white border-black/5 shadow-xl'
+              }`}>
+                <MetaIcon size={isSidebarCollapsed ? 24 : 40} />
+              </div>
             </div>
-          </div>
+          </button>
+
           {!isSidebarCollapsed && (
-            <div className="text-center animate-in fade-in slide-in-from-top-2 duration-500">
-              <h1 className={`font-black text-xl tracking-tighter leading-none mb-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                META <span className="text-prime-500 italic">BIZ</span>
-              </h1>
-              <p className="text-[9px] font-black uppercase tracking-[0.4em] opacity-40">{t('system_architect')}</p>
+            <div className="relative px-2">
+              <button 
+                onClick={() => setIsBrandSwitcherOpen(!isBrandSwitcherOpen)}
+                className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                  isDarkMode ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-gray-50 border-black/5 hover:bg-gray-100'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-prime-500 flex items-center justify-center text-white">
+                    <Building2 size={16} />
+                  </div>
+                  <div className="text-left">
+                    <p className={`text-[11px] font-black tracking-tight truncate w-32 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {brandData?.name ? brandData.name.toUpperCase() : 'META BIZ'}
+                    </p>
+                    <p className="text-[8px] font-black uppercase tracking-widest text-gray-500">{t('certified_brand')}</p>
+                  </div>
+                </div>
+                <ChevronDown size={14} className={`text-gray-500 transition-transform ${isBrandSwitcherOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Brand Dropdown */}
+              {isBrandSwitcherOpen && (
+                <div className="absolute top-full left-2 right-2 mt-2 p-2 rounded-2xl border bg-[#0a0f1d] border-white/10 shadow-2xl z-[100] animate-in fade-in zoom-in-95 duration-200">
+                  <div className="space-y-1">
+                    {brands.length > 0 ? brands.map(b => (
+                      <button
+                        key={b.id}
+                        onClick={() => {
+                          setActiveBrandId(b.id);
+                          setIsBrandSwitcherOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
+                          activeBrandId === b.id ? 'bg-prime-500/20 text-prime-400' : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                        }`}
+                      >
+                        <Store size={14} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">{b.name}</span>
+                        {activeBrandId === b.id && <Zap size={10} className="ml-auto" />}
+                      </button>
+                    )) : (
+                      <p className="p-4 text-[10px] text-gray-500 text-center uppercase tracking-widest italic">No other brands</p>
+                    )}
+                    <button className="w-full mt-2 p-3 rounded-xl border border-dashed border-white/10 text-gray-500 text-[9px] font-black uppercase tracking-widest hover:text-white hover:border-white/30 transition-all">
+                      + Add New Brand
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
-        </button>
-        
+        </div>
+       
         <nav className={`space-y-3 flex-1 transition-all duration-500 ${isSidebarCollapsed ? 'px-0' : ''}`}>
           {mainNav.map((item, index) => {
             const hasSub = item.sub && item.sub.length > 0;

@@ -37,10 +37,14 @@ import BlueprintArchitect from './components/Views/BlueprintArchitect';
 import KnowledgeBase from './components/Views/KnowledgeBase';
 import KnowledgeGaps from './components/Views/KnowledgeGaps';
 import DraftCenter from './components/Views/DraftCenter';
+import CommentDraftCenter from './components/Views/CommentDraftCenter';
+import OrderDrafting from './components/Views/OrderDrafting';
+import CatalogShareModal from './components/Inbox/CatalogShareModal';
 
 // Import Hooks
 import { useMetaChat } from './hooks/useMetaChat';
 import { useMetaData } from './hooks/useMetaData';
+import { useBrand } from './context/BrandContext';
 
 // Import Utilities
 import { translations } from './utils/translations';
@@ -49,6 +53,7 @@ import { db } from './firebase-client';
 import { doc, updateDoc, addDoc, collection, serverTimestamp, deleteDoc } from 'firebase/firestore';
 
 const Dashboard = () => {
+  const { brandData, activeBrandId } = useBrand();
   // --- Persistent State ---
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('metasolution_dark_mode');
@@ -58,7 +63,9 @@ const Dashboard = () => {
     const saved = localStorage.getItem('metasolution_theme');
     return saved || 'vortex';
   });
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('metasolution_active_tab') || 'home';
+  });
   const [language, setLanguage] = useState('en');
 
   // --- UI State ---
@@ -80,7 +87,8 @@ const Dashboard = () => {
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [followUpModal, setFollowUpModal] = useState({ isOpen: false, type: 'followup', convoId: null, reason: '', note: '' });
   const [attachedFiles, setAttachedFiles] = useState([]);
-
+  const [isOrderDraftingOpen, setIsOrderDraftingOpen] = useState(false);
+  const [isCatalogShareOpen, setIsCatalogShareOpen] = useState(false);
   // --- Refs ---
   const chatEndRef = useRef(null);
   const profileRef = useRef(null);
@@ -125,12 +133,12 @@ const Dashboard = () => {
     handleSuggestReply
   } = useMetaChat(scrollToBottom, isSelectMode, selectedConvoIds, setSelectedConvoIds);
 
-  const { gaps, drafts, library, products, conversations } = useMetaData();
+  const { gaps, drafts, library, products, conversations: allConversations, commentDrafts, pendingComments } = useMetaData();
 
   // Compute stats for HomeView
   const stats = {
-    totalMessages: conversations.reduce((acc, c) => acc + (c.messageCount || 0), 0),
-    newLeads: conversations.filter(c => c.isLead || c.isPriority || c.isFollowUp).length,
+    totalMessages: allConversations.reduce((acc, c) => acc + (c.messageCount || 0), 0),
+    newLeads: allConversations.filter(c => c.isLead || c.isPriority || c.isFollowUp).length,
     automationScore: 94,
     conversion: 3.2
   };
@@ -164,8 +172,9 @@ const Dashboard = () => {
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
+    localStorage.setItem('metasolution_active_tab', tabId);
     if (!['fb_inbox', 'fb_comments'].includes(tabId)) {
-        setSelectedConvo(null);
+      setSelectedConvo(null);
     }
   };
 
@@ -215,6 +224,7 @@ const Dashboard = () => {
       await addDoc(collection(db, "knowledge_base"), {
         keywords: [draft.keyword, ...(draft.approvedVariations || [])].filter(Boolean),
         answer: draft.result,
+        brandId: activeBrandId,
         timestamp: serverTimestamp()
       });
       await deleteDoc(doc(db, "draft_replies", draft.id));
@@ -230,6 +240,7 @@ const Dashboard = () => {
         result: manualReply || "AI is composing a response...",
         variations: [],
         approvedVariations: [],
+        brandId: activeBrandId,
         timestamp: new Date(),
         originGapId: gap.id
       });
@@ -274,8 +285,13 @@ const Dashboard = () => {
   };
 
   const handleDiscoverGaps = async () => {
+     if (!activeBrandId) return;
      try {
-       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/discover_gaps`, { method: 'POST' });
+       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/discover_gaps`, { 
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ brandId: activeBrandId })
+       });
        if (!response.ok) throw new Error('Discovery failed');
      } catch (e) {
        console.error("Discovery Error:", e);
@@ -371,15 +387,17 @@ const Dashboard = () => {
         : 'bg-slate-50 text-slate-900 selection:bg-prime-500/20'
     }`}>
       
-      {/* Animated Ambient Glows */}
+      {/* Animated Ambient Glows - Enhanced for Advance Look */}
       {isDarkMode && (
-        <>
-          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-prime-600/10 blur-[120px] rounded-full animate-pulse" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full animate-pulse delay-1000" />
-        </>
+        <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-prime-600/20 blur-[150px] rounded-full animate-pulse" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/15 blur-[150px] rounded-full animate-pulse delay-1000" />
+          <div className="absolute top-[30%] right-[10%] w-64 h-64 bg-blue-600/10 blur-[120px] rounded-full animate-bounce duration-[10000ms]" />
+        </div>
       )}
 
       <Sidebar 
+        brandData={brandData}
         mainNav={mainNav}
         activeTab={activeTab}
         theme={theme}
@@ -399,78 +417,85 @@ const Dashboard = () => {
         handleDrop={handleDrop}
       />
       
-      <main className="flex-1 p-8 overflow-y-auto" onScroll={handleScroll}>
-        {/* Header */}
-        <header className="flex justify-between items-center mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
-          <div>
-            <h2 className={`text-4xl font-black mb-1 tracking-tighter ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-              {t('system_status')}
-              <span className="text-prime-500 ml-1">.</span>
-            </h2>
-            <div className="flex items-center gap-3">
-              <div className="flex h-2 w-2 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+      <main className={`flex-1 relative z-10 transition-all duration-500 ${activeTab === 'fb_inbox' ? 'p-4' : 'p-8 overflow-y-auto'}`} onScroll={handleScroll}>
+        {/* Header - Hidden for Full-Bleed Inbox */}
+        {activeTab !== 'fb_inbox' && (
+          <header className="flex justify-between items-center mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
+            <div>
+              <h2 className={`text-4xl font-black mb-1 tracking-tighter ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                {t('system_status')}
+                <span className="text-prime-500 ml-1">.</span>
+              </h2>
+              <div className="flex items-center gap-3">
+                <div className="flex h-2 w-2 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </div>
+                <p className={`text-[10px] uppercase font-black tracking-[0.2em] ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                  {t('online')} • {t('version')} 2.4.0
+                </p>
               </div>
-              <p className={`text-[10px] uppercase font-black tracking-[0.2em] ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                {t('online')} • {t('version')} 2.4.0
-              </p>
             </div>
-          </div>
-          
-          <div className="flex items-center gap-6">
-            <div className="relative" ref={profileRef}>
-              <button 
-                onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all ${
-                  isDarkMode ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' : 'bg-white border-black/10 text-gray-900 shadow-sm hover:bg-gray-50'
-                }`}
-              >
-                <UserCircle size={28} className="text-prime-500" />
-              </button>
-              {isProfileOpen && <ProfileDropdown />}
+            
+            <div className="flex items-center gap-6">
+              <div className="relative" ref={profileRef}>
+                <button 
+                  onClick={() => setIsProfileOpen(!isProfileOpen)}
+                  className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all ${
+                    isDarkMode ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' : 'bg-white border-black/10 text-gray-900 shadow-sm hover:bg-gray-50'
+                  }`}
+                >
+                  <UserCircle size={28} className="text-prime-500" />
+                </button>
+                {isProfileOpen && <ProfileDropdown />}
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         {/* Tab Content */}
-        {activeTab === 'home' && <HomeView isDarkMode={isDarkMode} t={t} language={language} theme={theme} stats={stats} />}
-
-        {activeTab === 'fb_inbox' && (
-          <div className="animate-fade-in h-[calc(100vh-180px)] flex gap-8">
-            <div className="w-96 flex flex-col">
-               <h2 className="text-2xl font-black mb-6 uppercase tracking-tight italic flex items-center gap-3">
-                 <MessengerIcon size={24} />
+        {activeTab === 'home' && <HomeView isDarkMode={isDarkMode} t={t} language={language} theme={theme} stats={stats} gaps={gaps} />}        {activeTab === 'fb_inbox' && (
+          <div className={`animate-fade-in h-[calc(100vh-2rem)] flex overflow-hidden border backdrop-blur-3xl transition-all duration-700 ${
+            isDarkMode 
+              ? 'bg-[#020617]/40 border-white/5 rounded-[2.5rem] shadow-[0_40px_100px_-15px_rgba(0,0,0,0.7)]' 
+              : 'bg-white/80 border-black/5 rounded-[2.5rem] shadow-2xl'
+          }`}>
+            {/* Thread List Column */}
+            <div className={`w-80 flex flex-col shrink-0 border-r ${isDarkMode ? 'border-white/10' : 'border-black/5'}`}>
+               <h2 className="text-lg font-black p-6 uppercase tracking-tight italic flex items-center gap-3 border-b border-inherit">
+                 <MessengerIcon size={20} />
                  FB {t('inbox')}
                </h2>
-               <InboxFilterBar 
-                 isDarkMode={isDarkMode} 
-                 t={t} 
-                 inboxSearch={inboxSearch} 
-                 setInboxSearch={setInboxSearch} 
-                 inboxFilter={inboxFilter} 
-                 setInboxFilter={setInboxFilter}
-                 isSelectMode={isSelectMode}
-                 setIsSelectMode={setIsSelectMode}
-                 selectedConvoIds={selectedConvoIds}
-                 setSelectedConvoIds={setSelectedConvoIds}
-                 handleBulkAction={handleBulkAction}
-                 dateFilter={dateFilter}
-                 setDateFilter={setDateFilter}
-               />
-               <InboxList 
-                 isDarkMode={isDarkMode} 
-                 t={t} 
-                 conversations={conversations} 
-                 selectedConvo={selectedConvo} 
-                 setSelectedConvo={handleSelectConvo} 
-                 inboxFilter={inboxFilter} 
-                 inboxSearch={inboxSearch}
-                 dateFilter={dateFilter}
-                 isSelectMode={isSelectMode}
-                 selectedConvoIds={selectedConvoIds}
-               />
+               <div className="px-4 py-4 border-b border-inherit">
+                 <InboxFilterBar 
+                   isDarkMode={isDarkMode} 
+                   t={t} 
+                   inboxSearch={inboxSearch} 
+                   setInboxSearch={setInboxSearch} 
+                   inboxFilter={inboxFilter} 
+                   setInboxFilter={setInboxFilter}
+                   isSelectMode={isSelectMode}
+                   setIsSelectMode={setIsSelectMode}
+                   selectedConvoIds={selectedConvoIds}
+                 />
+               </div>
+               <div className="flex-1 overflow-y-auto">
+                 <InboxList 
+                   isDarkMode={isDarkMode} 
+                   t={t} 
+                   conversations={conversations} 
+                   selectedConvo={selectedConvo} 
+                   setSelectedConvo={handleSelectConvo} 
+                   inboxFilter={inboxFilter} 
+                   inboxSearch={inboxSearch}
+                   dateFilter={dateFilter}
+                   isSelectMode={isSelectMode}
+                   selectedConvoIds={selectedConvoIds}
+                 />
+               </div>
             </div>
+
+            {/* Chat Area Column */}
             <ChatWindow 
               isDarkMode={isDarkMode} 
               t={t} 
@@ -492,7 +517,11 @@ const Dashboard = () => {
               onScroll={handleScroll}
               showScrollButton={showScrollButton}
               scrollToBottom={scrollToBottom}
+              onOpenOrderDrafting={() => setIsOrderDraftingOpen(true)}
+              onOpenCatalogShare={() => setIsCatalogShareOpen(true)}
             />
+
+            {/* Details Column */}
             <SalesSidebar isDarkMode={isDarkMode} t={t} selectedConvo={selectedConvo} />
           </div>
         )}
@@ -518,6 +547,14 @@ const Dashboard = () => {
              toggleVariation={toggleVariation}
            />
          )}
+         {activeTab === 'fb_comments' && (
+           <CommentDraftCenter 
+             isDarkMode={isDarkMode} 
+             t={t} 
+             commentDrafts={commentDrafts} 
+             pendingComments={pendingComments}
+           />
+         )}
         {activeTab === 'library' && <KnowledgeBase isDarkMode={isDarkMode} t={t} library={library} />}
         {activeTab === 'products' && <ProductHub isDarkMode={isDarkMode} t={t} products={products} />}
         {activeTab === 'architect' && <BlueprintArchitect isDarkMode={isDarkMode} t={t} />}
@@ -530,7 +567,7 @@ const Dashboard = () => {
           />
         )}
 
-        {['fb_comments', 'ig_inbox', 'ig_comments', 'wa_inbox', 'inventory', 'admin'].includes(activeTab) && (
+        {['ig_inbox', 'ig_comments', 'wa_inbox', 'inventory', 'admin'].includes(activeTab) && (
           <div className={`animate-fade-in py-20 text-center rounded-3xl border transition-all ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white shadow-xl border-black/5'}`}>
             <Smartphone size={64} className="mx-auto text-prime-500/30 mb-6" />
             <h3 className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{t('coming_soon')}</h3>
@@ -574,6 +611,33 @@ const Dashboard = () => {
         )}
       </main>
 
+      {isCatalogShareOpen && (
+        <CatalogShareModal 
+          isOpen={isCatalogShareOpen}
+          isDarkMode={isDarkMode}
+          t={t}
+          products={products}
+          onClose={() => setIsCatalogShareOpen(false)}
+          onShare={(selectedProducts) => {
+             const text = `Check out our best-sellers:\n` + 
+              selectedProducts.map(p => `• ${p.name} - ${p.offerPrice || p.price} BDT`).join('\n') + 
+              `\nWhich one would you like to order?`;
+             setMessageInput(text);
+             setIsCatalogShareOpen(false);
+          }}
+        />
+      )}
+
+      {isOrderDraftingOpen && (
+        <OrderDrafting 
+          isDarkMode={isDarkMode} 
+          t={t} 
+          selectedConvo={selectedConvo} 
+          products={products}
+          activeBrandId={activeBrandId}
+          onClose={() => setIsOrderDraftingOpen(false)}
+        />
+      )}
       <FollowUpModal 
         isOpen={followUpModal.isOpen}
         onClose={() => setFollowUpModal({ ...followUpModal, isOpen: false })}

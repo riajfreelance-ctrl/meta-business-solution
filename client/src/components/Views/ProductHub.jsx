@@ -1,14 +1,20 @@
 import React, { useState } from 'react';
 import { Plus, Package, TrendingUp, Edit3, ShoppingBag } from 'lucide-react';
 import { db } from '../../firebase-client';
-import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import ActionMenu from '../Shared/ActionMenu';
 import ConfirmModal from '../Shared/ConfirmModal';
+import { useBrand } from '../../context/BrandContext';
 
 const ProductHub = ({ isDarkMode, t, products }) => {
+  const { activeBrandId } = useBrand();
   const [editingProduct, setEditingProduct] = useState(null);
   const [deletingProductId, setDeletingProductId] = useState(null);
-  const [editForm, setEditForm] = useState({ name: '', price: '', offerPrice: '', stock: '' });
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', price: '', offerPrice: '', stock: '', category: 'Serum' });
+  const [addForm, setAddForm] = useState({ name: '', price: '', offerPrice: '', stock: 'In Stock', category: 'Serum' });
+
+  const categories = ['Serum', 'Cream', 'Cleanser', 'Sunscreen', 'Mask', 'Other'];
 
   const handleEdit = (product) => {
     setEditingProduct(product);
@@ -16,8 +22,23 @@ const ProductHub = ({ isDarkMode, t, products }) => {
       name: product.name, 
       price: product.price, 
       offerPrice: product.offerPrice, 
-      stock: product.stock 
+      stock: product.stock,
+      category: product.category || 'Serum'
     });
+  };
+
+  const handleAdd = async () => {
+    if (!addForm.name || !addForm.price || !activeBrandId) return;
+    try {
+      await addDoc(collection(db, "products"), {
+        ...addForm,
+        brandId: activeBrandId
+      });
+      setIsAddModalOpen(false);
+      setAddForm({ name: '', price: '', offerPrice: '', stock: 'In Stock', category: 'Serum' });
+    } catch (error) {
+      console.error("Error adding product:", error);
+    }
   };
 
   const handleUpdate = async () => {
@@ -44,9 +65,12 @@ const ProductHub = ({ isDarkMode, t, products }) => {
     <div className="animate-fade-in space-y-8">
       <div className="flex justify-between items-center">
         <h3 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{t('products_offers')}</h3>
-        <button className={`px-6 py-2.5 rounded-xl flex items-center gap-2 font-bold transition-all shadow-lg ${
-          isDarkMode ? 'bg-prime-500 text-white shadow-prime-500/30' : 'bg-prime-600 text-white shadow-prime-600/30 hover:bg-prime-700'
-        }`}>
+        <button 
+          onClick={() => setIsAddModalOpen(true)}
+          className={`px-6 py-2.5 rounded-xl flex items-center gap-2 font-bold transition-all shadow-lg ${
+            isDarkMode ? 'bg-prime-500 text-white shadow-prime-500/30' : 'bg-prime-600 text-white shadow-prime-600/30 hover:bg-prime-700'
+          }`}
+        >
           <Plus size={20} />
           {t('add_product')}
         </button>
@@ -59,10 +83,15 @@ const ProductHub = ({ isDarkMode, t, products }) => {
           }`}>
             <div className={`h-48 relative flex items-center justify-center ${isDarkMode ? 'bg-white/5' : 'bg-slate-100'}`}>
               <Package size={48} className="text-gray-600 group-hover:scale-110 transition-transform duration-500" />
-              <div className="absolute top-4 right-4 flex gap-2">
-                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${p.stock === 'In Stock' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+              <div className="absolute top-4 right-4 flex flex-col gap-2 items-end">
+                 <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${p.stock === 'In Stock' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                    {p.stock}
                  </span>
+                 {p.category && (
+                   <span className="px-3 py-1 rounded-full bg-prime-500/20 text-prime-400 text-[10px] font-black uppercase">
+                     {p.category}
+                   </span>
+                 )}
               </div>
               <div className="absolute top-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity">
                  <ActionMenu 
@@ -156,6 +185,19 @@ const ProductHub = ({ isDarkMode, t, products }) => {
                 </div>
 
                 <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 pl-1">{t('category')}</label>
+                  <select 
+                    value={editForm.category}
+                    onChange={(e) => setEditForm({...editForm, category: e.target.value})}
+                    className={`w-full p-4 rounded-2xl outline-none border transition-all ${
+                      isDarkMode ? 'bg-black/20 border-white/10 text-white focus:border-prime-500/50' : 'bg-gray-50 border-black/5 text-gray-900 focus:border-prime-500/50'
+                    }`}
+                  >
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 pl-1">{t('stock_status')}</label>
                   <div className="flex gap-2">
                     {['In Stock', 'Out of Stock'].map(s => (
@@ -189,6 +231,97 @@ const ProductHub = ({ isDarkMode, t, products }) => {
                   className="flex-1 py-4 rounded-2xl font-bold bg-prime-500 text-white hover:bg-prime-600 shadow-xl shadow-prime-500/20 active:scale-95 transition-all"
                 >
                   {t('save_changes')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Product Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className={`w-full max-w-lg rounded-[2.5rem] border shadow-2xl overflow-hidden ${
+            isDarkMode ? 'bg-[#1a1a1a] border-white/10 text-white' : 'bg-white border-black/5 text-gray-900'
+          } animate-in zoom-in-95 duration-200`}>
+            <div className="p-8 space-y-6">
+              <div className="flex items-center gap-4 mb-2">
+                <div className="p-3 bg-prime-500/10 rounded-2xl">
+                  <Plus className="text-prime-400" size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black tracking-tight">{t('add_new_product')}</h3>
+                  <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em]">{t('expand')} {t('inventory')}</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 pl-1">{t('product_name')}</label>
+                  <input 
+                    type="text" 
+                    value={addForm.name}
+                    onChange={(e) => setAddForm({...addForm, name: e.target.value})}
+                    placeholder="e.g., Vitamin C Serum"
+                    className={`w-full p-4 rounded-2xl outline-none border transition-all ${
+                      isDarkMode ? 'bg-black/20 border-white/10 focus:border-prime-500/50' : 'bg-gray-50 border-black/5 focus:border-prime-500/50'
+                    }`}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 pl-1">{t('price')} (BDT)</label>
+                    <input 
+                      type="text" 
+                      value={addForm.price}
+                      onChange={(e) => setAddForm({...addForm, price: e.target.value})}
+                      className={`w-full p-4 rounded-2xl outline-none border transition-all ${
+                        isDarkMode ? 'bg-black/20 border-white/10 focus:border-prime-500/50' : 'bg-gray-50 border-black/5 focus:border-prime-500/50'
+                      }`}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 pl-1">{t('offer_price')} (BDT)</label>
+                    <input 
+                      type="text" 
+                      value={addForm.offerPrice}
+                      onChange={(e) => setAddForm({...addForm, offerPrice: e.target.value})}
+                      className={`w-full p-4 rounded-2xl outline-none border transition-all ${
+                        isDarkMode ? 'bg-black/20 border-white/10 focus:border-prime-500/50' : 'bg-gray-50 border-black/5 focus:border-prime-500/50'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 pl-1">{t('category')}</label>
+                  <select 
+                    value={addForm.category}
+                    onChange={(e) => setAddForm({...addForm, category: e.target.value})}
+                    className={`w-full p-4 rounded-2xl outline-none border transition-all ${
+                      isDarkMode ? 'bg-black/20 border-white/10 text-white focus:border-prime-500/50' : 'bg-gray-50 border-black/5 text-gray-900 focus:border-prime-500/50'
+                    }`}
+                  >
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button 
+                  onClick={() => setIsAddModalOpen(false)}
+                  className={`flex-1 py-4 rounded-2xl font-bold transition-all ${
+                    isDarkMode ? 'bg-white/5 hover:bg-white/10 text-gray-400' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                  }`}
+                >
+                  {t('cancel')}
+                </button>
+                <button 
+                  onClick={handleAdd}
+                  className="flex-1 py-4 rounded-2xl font-bold bg-prime-500 text-white hover:bg-prime-600 shadow-xl shadow-prime-500/20 active:scale-95 transition-all"
+                >
+                  {t('add_product')}
                 </button>
               </div>
             </div>

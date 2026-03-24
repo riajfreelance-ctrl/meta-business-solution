@@ -4,11 +4,13 @@ import { db } from '../../firebase-client';
 import { doc, updateDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import ActionMenu from '../Shared/ActionMenu';
 import ConfirmModal from '../Shared/ConfirmModal';
+import { useBrand } from '../../context/BrandContext';
 
 const DraftCenter = ({ 
   isDarkMode, t, drafts, language, handleApproveDraft, 
   handleExpandKeywords, expandingId, toggleVariation 
 }) => {
+  const { activeBrandId } = useBrand();
   const [editingDraft, setEditingDraft] = useState(null);
   const [deletingDraftId, setDeletingDraftId] = useState(null);
   const [selectedDetailDraft, setSelectedDetailDraft] = useState(null);
@@ -51,13 +53,14 @@ const DraftCenter = ({
   };
 
   const handleAddDraft = async () => {
-    if (!addForm.keyword || !addForm.result) return;
+    if (!addForm.keyword || !addForm.result || !activeBrandId) return;
     try {
       await addDoc(collection(db, "draft_replies"), {
         keyword: addForm.keyword,
         result: addForm.result,
         variations: [],
         approvedVariations: [],
+        brandId: activeBrandId,
         timestamp: new Date()
       });
       setIsAddingDraft(false);
@@ -221,8 +224,17 @@ const DraftCenter = ({
                     </button>
                   </td>
                   <td className="p-5">
-                    <div className="flex items-center gap-3">
-                       <span className={`text-sm font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{draft.keyword}</span>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-3">
+                         <span className={`text-sm font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{draft.keyword}</span>
+                      </div>
+                      {draft.type === 'auto_learned' && (
+                        <div className="flex">
+                          <span className="bg-prime-500/10 text-prime-400 px-1.5 py-0.5 rounded border border-prime-500/20 text-[7px] font-black uppercase tracking-widest">
+                            Auto-Learned
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td className="p-5 max-w-xs lg:max-w-md">
@@ -248,16 +260,25 @@ const DraftCenter = ({
                     <div className="flex justify-end items-center gap-2" onClick={(e) => e.stopPropagation()}>
                       <button 
                         onClick={() => handleApproveDraft(draft)}
-                        className={`p-2 rounded-xl transition-all ${isDarkMode ? 'bg-prime-500/10 text-prime-400 hover:bg-prime-500/20 shadow-lg shadow-prime-500/10' : 'bg-prime-50 bg-prime-500/10 text-prime-600 hover:bg-prime-500/20'}`}
+                        title="Approve"
+                        className={`p-2 rounded-xl transition-all ${isDarkMode ? 'bg-prime-500/10 text-prime-400 hover:bg-prime-500/20 shadow-lg shadow-prime-500/10' : 'bg-prime-50 text-prime-600 hover:bg-prime-500/10'}`}
                       >
                          <CheckCircle size={16} />
                       </button>
-                      <ActionMenu 
-                        isDarkMode={isDarkMode} 
-                        t={t} 
-                        onEdit={() => handleEdit(draft)} 
-                        onDelete={() => setDeletingDraftId(draft.id)} 
-                      />
+                      <button 
+                        onClick={() => handleEdit(draft)}
+                        title="Edit"
+                        className={`p-2 rounded-xl transition-all ${isDarkMode ? 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10' : 'bg-gray-100 text-gray-500 hover:text-gray-900 hover:bg-gray-200'}`}
+                      >
+                         <Edit3 size={16} />
+                      </button>
+                      <button 
+                        onClick={() => setDeletingDraftId(draft.id)}
+                        title="Delete"
+                        className={`p-2 rounded-xl transition-all ${isDarkMode ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'bg-red-50 text-red-500 hover:bg-red-100'}`}
+                      >
+                         <Trash2 size={16} />
+                      </button>
                     </div>
                   </td>
                 </tr>
