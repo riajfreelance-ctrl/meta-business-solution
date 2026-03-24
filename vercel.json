@@ -9,6 +9,7 @@
     { "src": "/webhook", "dest": "/api/webhook.js" },
     { "src": "/api/status", "dest": "/api/status.js" },
     { "src": "/api/(.*)", "dest": "/server/index.js" },
+    { "src": "/(.*)", "dest": "/client/index.html", "continue": true },
     { "src": "/(.*)", "dest": "/client/$1" }
   ]
 }
