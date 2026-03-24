@@ -13,29 +13,20 @@ const app = express()
     .use(cors({ origin: '*' }))
     .use(bodyParser.json())
     .use((req, res, next) => {
-      // Normalize URL: Strip /api if it exists to make routes consistent
-      if (req.url.startsWith('/api')) {
-        req.url = req.url.replace('/api', '') || '/';
-      }
-      console.log(`[INCOMING] ${req.method} ${req.originalUrl} -> ${req.url}`);
+      console.log(`[INCOMING] ${req.method} ${req.url}`);
       next();
     });
 
-// Main Endpoints (Internal paths after /api stripping)
+// Main Endpoints (Explicit /api prefix for Vercel)
+app.get('/api/status', (req, res) => res.json({ status: 'API Alive', version: '2.0.0-final' }));
 app.get('/webhook', fbController.verifyWebhook); 
 app.post('/webhook', fbController.handleWebhookPost);
-app.get('/status', (req, res) => res.json({ status: 'API Alive', version: '2.0.0-modular-api' }));
-app.get('/config-status', (req, res) => {
-  res.json({
-    gemini: !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY),
-    facebook: !!(process.env.FACEBOOK_PAGE_ID && (process.env.PAGE_ACCESS_TOKEN || process.env.FB_PAGE_TOKEN)),
-    whatsapp: !!(process.env.WHATSAPP_PHONE_ID && (process.env.WA_ACCESS_TOKEN || process.env.WA_PAGE_TOKEN))
-  });
-});
+app.get('/api/webhook', fbController.verifyWebhook); // Safety for both paths
+app.post('/api/webhook', fbController.handleWebhookPost); // Safety for both paths
 
-app.use('/', fbRoutes);
-app.use('/', waRoutes);
-app.use('/', aiRoutes);
+app.use('/api', fbRoutes);
+app.use('/api', waRoutes);
+app.use('/api', aiRoutes);
 app.get('/', (req, res) => res.send('Meta Business Solution Modular API Alive'));
 
 // Export for Vercel
