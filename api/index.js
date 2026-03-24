@@ -13,19 +13,19 @@ const app = express()
     .use(cors({ origin: '*' }))
     .use(bodyParser.json())
     .use((req, res, next) => {
-      console.log(`[INCOMING] ${req.method} ${req.url}`);
+      // Normalize URL: Strip /api if it exists to make routes consistent
+      if (req.url.startsWith('/api')) {
+        req.url = req.url.replace('/api', '') || '/';
+      }
+      console.log(`[INCOMING] ${req.method} ${req.originalUrl} -> ${req.url}`);
       next();
     });
 
-// Main Endpoints
+// Main Endpoints (Internal paths after /api stripping)
 app.get('/webhook', fbController.verifyWebhook); 
 app.post('/webhook', fbController.handleWebhookPost);
-app.use('/', fbRoutes);
-app.use('/', waRoutes);
-app.use('/api', aiRoutes);
-
-// Health Checks
-app.get('/api/config-status', (req, res) => {
+app.get('/status', (req, res) => res.json({ status: 'API Alive', version: '2.0.0-modular-api' }));
+app.get('/config-status', (req, res) => {
   res.json({
     gemini: !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY),
     facebook: !!(process.env.FACEBOOK_PAGE_ID && (process.env.PAGE_ACCESS_TOKEN || process.env.FB_PAGE_TOKEN)),
@@ -33,8 +33,10 @@ app.get('/api/config-status', (req, res) => {
   });
 });
 
-app.get('/api/status', (req, res) => res.json({ status: 'API Alive', version: '2.0.0-modular' }));
-app.get('/', (req, res) => res.send('Meta Business Solution Modular Server Alive'));
+app.use('/', fbRoutes);
+app.use('/', waRoutes);
+app.use('/', aiRoutes);
+app.get('/', (req, res) => res.send('Meta Business Solution Modular API Alive'));
 
 // Export for Vercel
 module.exports = app;
