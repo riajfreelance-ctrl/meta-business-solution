@@ -26,14 +26,14 @@ const InboxFilterBar = ({
   return (
     <div className="flex flex-col gap-4 mb-6 animate-fade-in relative">
       <div className="flex items-center gap-3">
-        <div className={`flex-1 flex items-center gap-3 px-4 py-2.5 rounded-2xl border transition-all ${
-          isDarkMode ? 'bg-white/5 border-white/10' : 'bg-gray-100 border-black/5'
+        <div className={`flex-1 flex items-center gap-3 px-5 py-3 rounded-2xl border transition-all group/search ${
+          isDarkMode ? 'bg-white/[0.03] border-white/10 focus-within:border-prime-500/50 shadow-inner' : 'bg-gray-100 border-black/5'
         }`}>
-          <Search size={18} className="text-gray-400" />
+          <Search size={18} className="text-gray-500 group-focus-within/search:text-prime-400 transition-colors" />
           <input 
             type="text" 
             placeholder={t('search_placeholder')}
-            className="bg-transparent border-none outline-none w-full text-sm font-medium"
+            className="bg-transparent border-none outline-none w-full text-xs font-bold placeholder:text-gray-600"
             value={inboxSearch}
             onChange={(e) => setInboxSearch(e.target.value)}
           />

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sun, Moon, Zap } from 'lucide-react';
+import { Sun, Moon, Activity } from 'lucide-react';
 
 export const ThemeToggle = ({ theme, setTheme, isDarkMode }) => {
   const cycleTheme = () => {
@@ -22,7 +22,7 @@ export const ThemeToggle = ({ theme, setTheme, isDarkMode }) => {
       <div className="relative w-6 h-6 flex items-center justify-center">
         {theme === 'light' && <Sun size={20} />}
         {theme === 'dark' && <Moon size={20} />}
-        {theme === 'vortex' && <Zap size={20} className="text-prime-400" />}
+        {theme === 'vortex' && <Activity size={20} className="text-prime-400" />}
       </div>
       <span className="text-[10px] font-black uppercase tracking-widest hidden md:block">
         {theme === 'vortex' ? 'Vortex' : theme === 'dark' ? 'Dark' : 'Light'}

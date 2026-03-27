@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Zap, 
+  Activity, 
   CheckCircle, 
   Search, 
   AlertCircle, 
@@ -243,7 +243,7 @@ const KnowledgeGaps = ({ isDarkMode, t, gaps: initialGaps = [], handleConvertToD
                 : 'bg-gradient-to-br from-prime-600 to-indigo-600 text-white shadow-prime-600/20 hover:scale-[1.02]'
            }`}
          >
-            {isDiscovering ? <Zap className="animate-spin" size={16} /> : <Zap size={16} fill="currentColor" />}
+            {isDiscovering ? <Activity className="animate-spin" size={16} /> : <Activity size={16} fill="currentColor" />}
             Generate Practical Scenarios
          </button>
       </div>

@@ -5,9 +5,7 @@ import { BrandProvider } from './context/BrandContext'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
     <BrandProvider>
       <Dashboard />
     </BrandProvider>
-  </React.StrictMode>,
 )

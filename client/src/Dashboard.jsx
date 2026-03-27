@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   UserCircle, 
   Settings, 
   MessageSquare, 
   MessageCircle,
-  Zap, 
+  Activity, 
   TrendingUp, 
   Database, 
   User, 
@@ -19,8 +19,12 @@ import {
   FileText,
   AlertCircle,
   BookOpen,
-  Cpu
+  Cpu,
+  RotateCcw, Bookmark, Star, ChevronDown, Plus,
+  Maximize, ZoomIn, ZoomOut, ChevronLeft, ChevronRight,
+  X, XCircle, Info, Download, ShoppingCart
 } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 // Import Modular Components
 import { MetaIcon, MessengerIcon, FacebookIcon, InstagramIcon, WhatsAppIcon } from './components/Icons';
@@ -39,7 +43,15 @@ import KnowledgeGaps from './components/Views/KnowledgeGaps';
 import DraftCenter from './components/Views/DraftCenter';
 import CommentDraftCenter from './components/Views/CommentDraftCenter';
 import OrderDrafting from './components/Views/OrderDrafting';
+import OrdersView from './components/Views/OrdersView';
 import CatalogShareModal from './components/Inbox/CatalogShareModal';
+import MediaGalleryModal from './components/Inbox/MediaGalleryModal';
+import Lightbox from './components/Inbox/Lightbox';
+import BrandOnboarding from './components/Brand/BrandOnboarding';
+import SuperAdminPanel from './components/Views/SuperAdminPanel';
+import GlobalBanner from './components/Shared/GlobalBanner';
+import BillingView from './components/Views/BillingView';
+import AuthView from './components/Views/AuthView';
 
 // Import Hooks
 import { useMetaChat } from './hooks/useMetaChat';
@@ -48,12 +60,50 @@ import { useBrand } from './context/BrandContext';
 
 // Import Utilities
 import { translations } from './utils/translations';
-import { safeToDate } from './utils/helpers';
 import { db } from './firebase-client';
 import { doc, updateDoc, addDoc, collection, serverTimestamp, deleteDoc } from 'firebase/firestore';
 
+// --- Global Error Boundary ---
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("Metabiz Core Error Boundary Caught:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-20 bg-red-900/10 border border-red-500/30 rounded-[3rem] m-10 text-center space-y-6 backdrop-blur-3xl animate-in zoom-in duration-500">
+          <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto shadow-2xl shadow-red-500/20">
+            <AlertCircle size={40} className="text-red-500" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-5xl font-black italic tracking-tighter text-white">SYSTEM CRASH <span className="text-red-500">DETECTED</span></h2>
+            <p className="text-[10px] font-black text-red-400 uppercase tracking-[0.5em] opacity-80 leading-relaxed max-w-md mx-auto">
+              {this.state.error?.message || "QUANTUM LOGIC FAILURE IN COMPONENT TREE"}
+            </p>
+          </div>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-10 py-5 bg-white text-black text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-gray-200 transition-all active:scale-95 shadow-2xl"
+          >
+            Re-Initialize Core Engine
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const Dashboard = () => {
-  const { brandData, activeBrandId } = useBrand();
+  const { brandData, activeBrandId, loading, role, user, login, logout } = useBrand();
+
   // --- Persistent State ---
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('metasolution_dark_mode');
@@ -64,6 +114,8 @@ const Dashboard = () => {
     return saved || 'vortex';
   });
   const [activeTab, setActiveTab] = useState(() => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash) return hash;
     return localStorage.getItem('metasolution_active_tab') || 'home';
   });
   const [language, setLanguage] = useState('en');
@@ -89,33 +141,22 @@ const Dashboard = () => {
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [isOrderDraftingOpen, setIsOrderDraftingOpen] = useState(false);
   const [isCatalogShareOpen, setIsCatalogShareOpen] = useState(false);
+  const [isMediaGalleryOpen, setIsMediaGalleryOpen] = useState(false);
+  const [lightbox, setLightbox] = useState({ isOpen: false, images: [], index: 0, zoom: 1 });
+  const [isBrandOnboardingOpen, setIsBrandOnboardingOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
   // --- Refs ---
   const chatEndRef = useRef(null);
   const profileRef = useRef(null);
 
-  const scrollToBottom = useCallback(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = useCallback((behavior = 'smooth') => {
+    chatEndRef.current?.scrollIntoView({ behavior });
   }, []);
 
-  // --- Drag and Drop Handlers ---
-  const handleDragStart = (e, type, mainIdx, subIdx = null) => {
-    setDraggedMainIdx(mainIdx);
-    setDraggedSubIdx(subIdx);
-    e.dataTransfer.setData('type', type);
-  };
-
-  const handleDragOver = (e, type, mainIdx, subIdx = null) => {
-    e.preventDefault();
-  };
-
-  const handleDragEnd = () => {
-    setDraggedMainIdx(null);
-    setDraggedSubIdx(null);
-  };
-
-  const handleDrop = (e) => {
-    console.log("Dropped!");
-  };
+  // --- Stable Refs for Hooks to prevent Infinite Loops ---
+  const stableScrollToBottom = useCallback((behavior) => scrollToBottom(behavior), [scrollToBottom]);
+  const stableSetSelectedConvoIds = useCallback((ids) => setSelectedConvoIds(ids), []);
 
   // --- Logic Hooks ---
   const {
@@ -127,23 +168,32 @@ const Dashboard = () => {
     setMessageInput,
     isAiThinking,
     isSyncingHistory,
+    isSending,
+    optimisticMessages,
+    replyTo, setReplyTo,
+    editingMessage, startEditMessage,
+    handleDeleteMessage, cancelInteractions,
     handleSelectConvo,
     handleSendMessage,
     syncHistory,
     handleSuggestReply
-  } = useMetaChat(scrollToBottom, isSelectMode, selectedConvoIds, setSelectedConvoIds);
+  } = useMetaChat(stableScrollToBottom, isSelectMode, selectedConvoIds, stableSetSelectedConvoIds);
 
-  const { gaps, drafts, library, products, conversations: allConversations, commentDrafts, pendingComments } = useMetaData();
+  const { gaps, drafts, library, products, conversations: allConversations = [], commentDrafts, pendingComments, orders } = useMetaData();
 
-  // Compute stats for HomeView
-  const stats = {
-    totalMessages: allConversations.reduce((acc, c) => acc + (c.messageCount || 0), 0),
-    newLeads: allConversations.filter(c => c.isLead || c.isPriority || c.isFollowUp).length,
+  // Compute stats for HomeView (Safe version)
+  const stats = useMemo(() => ({
+    totalMessages: (allConversations || []).reduce((acc, c) => acc + (c?.messageCount || 0), 0),
+    newLeads: (allConversations || []).filter(c => c?.isLead || c?.isPriority || c?.isFollowUp).length,
     automationScore: 94,
     conversion: 3.2
-  };
+  }), [allConversations]);
 
   // --- Effects ---
+  useEffect(() => {
+    document.title = brandData?.name ? `${brandData.name} • Metabiz` : 'Metabiz';
+  }, [brandData]);
+
   useEffect(() => {
     localStorage.setItem('metasolution_dark_mode', JSON.stringify(isDarkMode));
     if (isDarkMode) document.documentElement.classList.add('dark');
@@ -167,26 +217,33 @@ const Dashboard = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // --- Helpers & Handlers ---
-  const t = (key) => translations[language][key] || key;
+  useEffect(() => {
+    const handlePopState = () => {
+      let hash = window.location.hash.replace('#', '');
+      if (!hash) hash = localStorage.getItem('metasolution_active_tab') || 'home';
+      setActiveTab(hash);
+      localStorage.setItem('metasolution_active_tab', hash);
+      if (!['fb_inbox', 'fb_comments'].includes(hash)) setSelectedConvo(null);
+    };
+    window.addEventListener('popstate', handlePopState);
+    if (!window.location.hash) {
+      window.history.replaceState({ tab: activeTab }, '', `#${activeTab}`);
+    }
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeTab, setSelectedConvo]);
 
-  const handleTabChange = (tabId) => {
+  const t = useCallback((key) => {
+    return (translations[language] && translations[language][key]) || key;
+  }, [language]);
+
+  const handleTabChange = useCallback((tabId) => {
     setActiveTab(tabId);
     localStorage.setItem('metasolution_active_tab', tabId);
+    window.history.pushState({ tab: tabId }, '', `#${tabId}`);
     if (!['fb_inbox', 'fb_comments'].includes(tabId)) {
       setSelectedConvo(null);
     }
-  };
-
-  const handleBulkAction = (action) => {
-    console.log("Bulk action:", action, Array.from(selectedConvoIds));
-    if (action === 'all') {
-      setSelectedConvoIds(new Set(conversations.map(c => c.id)));
-    } else {
-      setIsSelectMode(false);
-      setSelectedConvoIds(new Set());
-    }
-  };
+  }, [setSelectedConvo]);
 
   const togglePriority = (convoId) => {
     setFollowUpModal({ isOpen: true, type: 'priority', convoId, reason: '', note: '' });
@@ -218,8 +275,25 @@ const Dashboard = () => {
     } catch (e) { console.error(e); }
   };
 
+  const handleBulkAction = async (action) => {
+    if (action === 'all') {
+      const allIds = new Set(conversations.map(c => c.id));
+      stableSetSelectedConvoIds(allIds);
+      return;
+    }
+    if (selectedConvoIds.size === 0) return;
+    for (const cid of selectedConvoIds) {
+      const docRef = doc(db, "conversations", cid);
+      if (action === 'mark_read') await updateDoc(docRef, { unread: false });
+      if (action === 'mark_priority') await updateDoc(docRef, { isPriority: true });
+      if (action === 'delete') await deleteDoc(docRef);
+    }
+    stableSetSelectedConvoIds(new Set());
+    setIsSelectMode(false);
+  };
+
   const handleApproveDraft = useCallback(async (draft) => {
-    if (!draft || !draft.id) return;
+    if (!draft || !draft.id || !activeBrandId) return;
     try {
       await addDoc(collection(db, "knowledge_base"), {
         keywords: [draft.keyword, ...(draft.approvedVariations || [])].filter(Boolean),
@@ -231,9 +305,16 @@ const Dashboard = () => {
     } catch (e) { 
       console.error("Approval failed:", e); 
     }
-  }, []);
+  }, [activeBrandId]);
+
+  const handleForwardMessage = useCallback((msg) => {
+    const textToCopy = msg.text || msg.message || (msg.attachments?.length ? '[Attachment]' : '');
+    if (textToCopy) navigator.clipboard.writeText(textToCopy);
+    alert(t ? t('message_copied') || 'Message copied to clipboard for forwarding!' : 'Message copied!');
+  }, [t]);
 
   const handleConvertToDraft = useCallback(async (gap, manualReply = "") => {
+    if (!activeBrandId) return;
     try {
       await addDoc(collection(db, "draft_replies"), {
         keyword: gap.question,
@@ -250,7 +331,7 @@ const Dashboard = () => {
     } catch (e) {
       console.error("Conversion failed:", e);
     }
-  }, []);
+  }, [activeBrandId]);
 
   const handleExpandKeywords = async (id, kw) => {
      setExpandingId(id);
@@ -299,12 +380,12 @@ const Dashboard = () => {
   };
 
   const updateMissionFocus = () => {
-    // Save to Firestore
+    // Mission focus state can be updated here
   };
 
   // --- Main Navigation Configuration ---
-  const mainNav = [
-    { id: 'home', icon: TrendingUp, label: 'home', fixed: true },
+  const mainNav = useMemo(() => [
+    { id: 'home', icon: Activity, label: 'home', fixed: true },
     { 
       id: 'facebook', 
       icon: FacebookIcon, 
@@ -337,6 +418,7 @@ const Dashboard = () => {
       label: 'products_offers',
       sub: [
         { id: 'products', label: 'product', icon: ShoppingBag },
+        { id: 'orders', label: 'orders', icon: ShoppingCart },
         { id: 'inventory', label: 'inventory', icon: Layers },
         { id: 'offers', label: 'offers', icon: Tag }
       ]
@@ -352,9 +434,9 @@ const Dashboard = () => {
         { id: 'architect', label: 'blueprint_architect', icon: Cpu }
       ]
     },
-    { id: 'admin', icon: ShieldCheck, label: 'admin' },
+    ...((role === 'super-admin') ? [{ id: 'admin', icon: ShieldCheck, label: 'admin' }] : []),
     { id: 'settings_tab', icon: Settings, label: 'setting' },
-  ];
+  ], [role]);
 
   // --- Profile Component ---
   const ProfileDropdown = () => (
@@ -363,14 +445,20 @@ const Dashboard = () => {
     }`}>
       <div className="p-6 text-center border-b border-white/5">
         <div className="w-16 h-16 rounded-full bg-prime-500/20 flex items-center justify-center text-prime-500 font-bold mx-auto mb-3 text-xl">
-          M
+          {brandData?.name?.[0].toUpperCase() || 'M'}
         </div>
         <p className="font-bold text-sm">Managing Director</p>
-        <p className="text-[10px] opacity-40 uppercase tracking-widest font-black">Meta Solution</p>
+        <p className="text-[10px] opacity-40 uppercase tracking-widest font-black">{brandData?.name || 'Meta Solution'}</p>
       </div>
       <div className="p-2">
         {['profile', 'my_plan', 'billing', 'logout'].map(item => (
-          <button key={item} className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+          <button 
+            key={item} 
+            onClick={() => {
+              if (item === 'logout') logout();
+              else if (item === 'billing' || item === 'my_plan') { handleTabChange('billing'); setIsProfileOpen(false); }
+            }} 
+            className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
             isDarkMode ? 'hover:bg-white/5 text-gray-400 hover:text-white' : 'hover:bg-gray-50 text-gray-600'
           }`}>
             {t(item)}
@@ -379,274 +467,254 @@ const Dashboard = () => {
       </div>
     </div>
   );
+  // --- Bottom Navigation (Mobile) ---
+  const BottomNav = () => (
+    <div className={`lg:hidden fixed bottom-0 left-0 right-0 border-t z-[100] px-6 py-4 flex justify-between items-center backdrop-blur-3xl animate-in slide-in-from-bottom duration-500 ${
+      isDarkMode ? 'bg-[#020617]/80 border-white/10' : 'bg-white/90 border-black/10'
+    }`}>
+      {[
+        { id: 'home', icon: Activity },
+        { id: 'fb_inbox', icon: MessageSquare },
+        { id: 'admin', icon: ShieldCheck, show: role === 'super-admin' },
+        { id: 'settings_tab', icon: Settings },
+        { id: 'menu', icon: PanelLeft, label: 'Menu', onClick: () => setIsMobileMenuOpen(!isMobileMenuOpen) }
+      ].filter(item => item.show !== false).map(item => (
+        <button
+          key={item.id}
+          onClick={item.onClick || (() => handleTabChange(item.id))}
+          className={`relative p-3 rounded-2xl transition-all active:scale-90 ${
+            activeTab === item.id || (item.id === 'menu' && isMobileMenuOpen)
+              ? 'text-prime-400 bg-prime-500/10' 
+              : 'text-gray-500 hover:text-gray-300'
+          }`}
+        >
+          <item.icon size={22} />
+          {activeTab === item.id && (
+            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-prime-500 rounded-full shadow-[0_0_10px_rgba(139,92,246,0.8)]" />
+          )}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (loading && !brandData) {
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-[#020617] gap-6">
+        <Activity size={32} className="text-prime-400 animate-pulse" />
+        <p className="text-[10px] font-black uppercase tracking-[.3em] text-prime-400 animate-pulse">Synchronizing Core Engine</p>
+      </div>
+    );
+  }
+
+  if (!loading && !user) {
+    return <AuthView isDarkMode={isDarkMode} onAuthSuccess={(userData) => login(userData)} />;
+  }
 
   return (
-    <div className={`flex min-h-screen transition-all duration-300 relative overflow-hidden ${
-      isDarkMode 
-        ? 'bg-[#020617] text-slate-200 selection:bg-prime-500/30' 
-        : 'bg-slate-50 text-slate-900 selection:bg-prime-500/20'
+    <div className={`h-screen flex transition-all duration-300 relative overflow-hidden ${
+      isDarkMode ? 'bg-[#020617] text-slate-200' : 'bg-slate-50 text-slate-900'
     }`}>
       
-      {/* Animated Ambient Glows - Enhanced for Advance Look */}
       {isDarkMode && (
         <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-prime-600/20 blur-[150px] rounded-full animate-pulse" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/15 blur-[150px] rounded-full animate-pulse delay-1000" />
-          <div className="absolute top-[30%] right-[10%] w-64 h-64 bg-blue-600/10 blur-[120px] rounded-full animate-bounce duration-[10000ms]" />
+          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-prime-600/10 blur-[150px] rounded-full" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/10 blur-[150px] rounded-full" />
         </div>
       )}
 
-      <Sidebar 
-        brandData={brandData}
-        mainNav={mainNav}
-        activeTab={activeTab}
-        theme={theme}
-        isDarkMode={isDarkMode}
-        isSidebarCollapsed={isSidebarCollapsed}
-        setIsSidebarCollapsed={setIsSidebarCollapsed}
-        language={language}
-        t={t}
-        handleTabChange={handleTabChange}
-        expandedMenus={expandedMenus}
-        setExpandedMenus={setExpandedMenus}
-        draggedMainIdx={draggedMainIdx}
-        draggedSubIdx={draggedSubIdx}
-        handleDragStart={handleDragStart}
-        handleDragOver={handleDragOver}
-        handleDragEnd={handleDragEnd}
-        handleDrop={handleDrop}
-      />
+      <ErrorBoundary>
+        <Sidebar 
+          brandData={brandData}
+          mainNav={mainNav}
+          activeTab={activeTab}
+          isDarkMode={isDarkMode}
+          isSidebarCollapsed={isSidebarCollapsed}
+          setIsSidebarCollapsed={setIsSidebarCollapsed}
+          t={t}
+          handleTabChange={(tab) => {
+            handleTabChange(tab);
+            setIsMobileMenuOpen(false);
+          }}
+          expandedMenus={expandedMenus}
+          setExpandedMenus={setExpandedMenus}
+          onOpenBrandOnboarding={() => setIsBrandOnboardingOpen(true)}
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+        />
+      </ErrorBoundary>
       
-      <main className={`flex-1 relative z-10 transition-all duration-500 ${activeTab === 'fb_inbox' ? 'p-4' : 'p-8 overflow-y-auto'}`} onScroll={handleScroll}>
-        {/* Header - Hidden for Full-Bleed Inbox */}
-        {activeTab !== 'fb_inbox' && (
-          <header className="flex justify-between items-center mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
-            <div>
-              <h2 className={`text-4xl font-black mb-1 tracking-tighter ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                {t('system_status')}
-                <span className="text-prime-500 ml-1">.</span>
-              </h2>
-              <div className="flex items-center gap-3">
-                <div className="flex h-2 w-2 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                </div>
-                <p className={`text-[10px] uppercase font-black tracking-[0.2em] ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                  {t('online')} • {t('version')} 2.4.0
-                </p>
+      <main className={`flex-1 flex flex-col relative z-10 transition-all duration-700 ${activeTab === 'fb_inbox' ? 'p-0 overflow-hidden' : 'p-8 overflow-y-auto'}`} onScroll={handleScroll}>
+        <ErrorBoundary>
+          {activeTab !== 'fb_inbox' && (
+            <header className="flex justify-between items-center mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
+              <div>
+                <h2 className={`text-4xl font-black mb-1 tracking-tighter ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{t('system_status')} <span className="text-prime-500">.</span></h2>
+                <p className="text-[10px] uppercase font-black tracking-[0.2em] opacity-40 italic">{brandData?.name} Hub • v2.4.0</p>
               </div>
-            </div>
-            
-            <div className="flex items-center gap-6">
               <div className="relative" ref={profileRef}>
                 <button 
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
-                  className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all ${
-                    isDarkMode ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' : 'bg-white border-black/10 text-gray-900 shadow-sm hover:bg-gray-50'
-                  }`}
+                  className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all ${isDarkMode ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-black/10'}`}
                 >
-                  <UserCircle size={28} className="text-prime-500" />
+                  <UserCircle size={24} className="text-prime-500" />
                 </button>
                 {isProfileOpen && <ProfileDropdown />}
               </div>
-            </div>
-          </header>
-        )}
+            </header>
+          )}
+          
+          <GlobalBanner isDarkMode={isDarkMode} />
 
-        {/* Tab Content */}
-        {activeTab === 'home' && <HomeView isDarkMode={isDarkMode} t={t} language={language} theme={theme} stats={stats} gaps={gaps} />}        {activeTab === 'fb_inbox' && (
-          <div className={`animate-fade-in h-[calc(100vh-2rem)] flex overflow-hidden border backdrop-blur-3xl transition-all duration-700 ${
-            isDarkMode 
-              ? 'bg-[#020617]/40 border-white/5 rounded-[2.5rem] shadow-[0_40px_100px_-15px_rgba(0,0,0,0.7)]' 
-              : 'bg-white/80 border-black/5 rounded-[2.5rem] shadow-2xl'
-          }`}>
-            {/* Thread List Column */}
-            <div className={`w-80 flex flex-col shrink-0 border-r ${isDarkMode ? 'border-white/10' : 'border-black/5'}`}>
-               <h2 className="text-lg font-black p-6 uppercase tracking-tight italic flex items-center gap-3 border-b border-inherit">
-                 <MessengerIcon size={20} />
-                 FB {t('inbox')}
-               </h2>
-               <div className="px-4 py-4 border-b border-inherit">
-                 <InboxFilterBar 
-                   isDarkMode={isDarkMode} 
-                   t={t} 
-                   inboxSearch={inboxSearch} 
-                   setInboxSearch={setInboxSearch} 
-                   inboxFilter={inboxFilter} 
-                   setInboxFilter={setInboxFilter}
-                   isSelectMode={isSelectMode}
-                   setIsSelectMode={setIsSelectMode}
-                   selectedConvoIds={selectedConvoIds}
-                 />
-               </div>
-               <div className="flex-1 overflow-y-auto">
-                 <InboxList 
-                   isDarkMode={isDarkMode} 
-                   t={t} 
-                   conversations={conversations} 
-                   selectedConvo={selectedConvo} 
-                   setSelectedConvo={handleSelectConvo} 
-                   inboxFilter={inboxFilter} 
-                   inboxSearch={inboxSearch}
-                   dateFilter={dateFilter}
-                   isSelectMode={isSelectMode}
-                   selectedConvoIds={selectedConvoIds}
-                 />
-               </div>
-            </div>
-
-            {/* Chat Area Column */}
-            <ChatWindow 
-              isDarkMode={isDarkMode} 
-              t={t} 
-              selectedConvo={selectedConvo} 
-              chatMessages={chatMessages}
-              handleSuggestReply={handleSuggestReply} 
-              handleSendMessage={handleSendMessage}
-              isAiThinking={isAiThinking} 
-              messageInput={messageInput} 
-              setMessageInput={setMessageInput} 
-              attachedFiles={attachedFiles}
-              setAttachedFiles={setAttachedFiles}
-              handleFileChange={handleFileChange}
-              togglePriority={togglePriority}
-              toggleFollowUp={toggleFollowUp}
-              isSyncingHistory={isSyncingHistory}
-              syncHistory={syncHistory}
-              chatEndRef={chatEndRef}
-              onScroll={handleScroll}
-              showScrollButton={showScrollButton}
-              scrollToBottom={scrollToBottom}
-              onOpenOrderDrafting={() => setIsOrderDraftingOpen(true)}
-              onOpenCatalogShare={() => setIsCatalogShareOpen(true)}
-            />
-
-            {/* Details Column */}
-            <SalesSidebar isDarkMode={isDarkMode} t={t} selectedConvo={selectedConvo} />
-          </div>
-        )}
-
-        {activeTab === 'gaps' && (
-          <KnowledgeGaps 
-            isDarkMode={isDarkMode} 
-            t={t} 
-            gaps={gaps} 
-            handleConvertToDraft={handleConvertToDraft}
-            handleDiscoverGaps={handleDiscoverGaps}
-          />
-        )}
-         {activeTab === 'drafts' && (
-           <DraftCenter 
-             isDarkMode={isDarkMode} 
-             t={t} 
-             drafts={drafts} 
-             language={language} 
-             handleApproveDraft={handleApproveDraft}
-             handleExpandKeywords={handleExpandKeywords}
-             expandingId={expandingId}
-             toggleVariation={toggleVariation}
-           />
-         )}
-         {activeTab === 'fb_comments' && (
-           <CommentDraftCenter 
-             isDarkMode={isDarkMode} 
-             t={t} 
-             commentDrafts={commentDrafts} 
-             pendingComments={pendingComments}
-           />
-         )}
-        {activeTab === 'library' && <KnowledgeBase isDarkMode={isDarkMode} t={t} library={library} />}
-        {activeTab === 'products' && <ProductHub isDarkMode={isDarkMode} t={t} products={products} />}
-        {activeTab === 'architect' && <BlueprintArchitect isDarkMode={isDarkMode} t={t} />}
-        {activeTab === 'settings_tab' && (
-          <SettingsView 
-            isDarkMode={isDarkMode} 
-            theme={theme}
-            setTheme={setTheme}
-            t={t} 
-          />
-        )}
-
-        {['ig_inbox', 'ig_comments', 'wa_inbox', 'inventory', 'admin'].includes(activeTab) && (
-          <div className={`animate-fade-in py-20 text-center rounded-3xl border transition-all ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white shadow-xl border-black/5'}`}>
-            <Smartphone size={64} className="mx-auto text-prime-500/30 mb-6" />
-            <h3 className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{t('coming_soon')}</h3>
-            <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>{t('coming_soon_desc')}</p>
-          </div>
-        )}
-
-        {activeTab === 'offers' && (
-          <div className="animate-fade-in space-y-8">
-            <div className={`p-8 rounded-3xl border transition-all ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white shadow-xl border-black/5'}`}>
-              <div className="flex items-center gap-4 mb-6">
-                <div className="p-3 bg-prime-500/10 rounded-2xl">
-                  <Zap className="text-prime-400" size={24} />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold">{t('mission_focus')}</h3>
-                  <p className="text-gray-500 text-sm">Set your current business objective to align the AI response strategy.</p>
+          <div className={`flex-1 flex flex-col ${activeTab === 'fb_inbox' ? 'min-h-0 h-full overflow-hidden' : ''}`}>
+            {activeTab === 'home' && <HomeView stats={stats} t={t} isDarkMode={isDarkMode} gaps={gaps} />}
+            {activeTab === 'fb_inbox' && (
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="h-full flex overflow-hidden">
+                   <div className="w-80 border-r border-white/5 flex flex-col shrink-0">
+                      <InboxFilterBar 
+                        inboxSearch={inboxSearch} 
+                        setInboxSearch={setInboxSearch} 
+                        inboxFilter={inboxFilter} 
+                        setInboxFilter={setInboxFilter} 
+                        dateFilter={dateFilter}
+                        setDateFilter={setDateFilter}
+                        isSelectMode={isSelectMode}
+                        setIsSelectMode={setIsSelectMode}
+                        selectedConvoIds={selectedConvoIds}
+                        handleBulkAction={handleBulkAction}
+                        t={t} 
+                        isDarkMode={isDarkMode} 
+                      />
+                      <InboxList conversations={conversations} selectedConvo={selectedConvo} setSelectedConvo={handleSelectConvo} t={t} isDarkMode={isDarkMode} />
+                   </div>
+                   <ChatWindow 
+                    selectedConvo={selectedConvo} 
+                    chatMessages={chatMessages} 
+                    messageInput={messageInput} 
+                    setMessageInput={setMessageInput} 
+                    handleSendMessage={handleSendMessage} 
+                    attachedFiles={attachedFiles}
+                    setAttachedFiles={setAttachedFiles}
+                    optimisticMessages={optimisticMessages}
+                    replyTo={replyTo}
+                    setReplyTo={setReplyTo}
+                    editingMessage={editingMessage}
+                    startEditMessage={startEditMessage}
+                    handleDeleteMessage={handleDeleteMessage}
+                    cancelInteractions={cancelInteractions}
+                    drafts={drafts}
+                    t={t} 
+                    isDarkMode={isDarkMode} 
+                    isAiThinking={isAiThinking}
+                    handleFileChange={handleFileChange}
+                    isSyncingHistory={isSyncingHistory}
+                    syncHistory={syncHistory}
+                    toggleFollowUp={toggleFollowUp}
+                    togglePriority={togglePriority}
+                    chatEndRef={chatEndRef}
+                    onScroll={handleScroll}
+                    showScrollButton={showScrollButton}
+                    scrollToBottom={stableScrollToBottom}
+                    onOpenOrderDrafting={() => setIsOrderDraftingOpen(true)}
+                    onOpenCatalogShare={() => setIsCatalogShareOpen(true)}
+                    onOpenMediaGallery={() => setIsMediaGalleryOpen(true)}
+                    onForward={handleForwardMessage}
+                    setLightbox={setLightbox}
+                   />
+                   <SalesSidebar 
+                    isDarkMode={isDarkMode} 
+                    t={t} 
+                    selectedConvo={selectedConvo} 
+                    setSelectedConvo={setSelectedConvo}
+                    chatMessages={chatMessages} 
+                    orders={orders}
+                    setLightbox={setLightbox}
+                    onOpenMediaGallery={() => setIsMediaGalleryOpen(true)}
+                    onViewOrders={() => handleTabChange('orders')}
+                  />
                 </div>
               </div>
-              <div className="relative">
-                <input 
-                  type="text" 
-                  value={missionFocus}
-                  onChange={(e) => setMissionFocus(e.target.value)}
-                  onBlur={updateMissionFocus}
-                  placeholder={t('mission_focus') + '...'}
-                  className={`pl-12 pr-4 py-4 rounded-2xl w-full text-lg transition-all ${
-                    isDarkMode ? 'bg-black/20 border border-white/10 text-white focus:ring-prime-500' : 'bg-slate-50 border border-black/10 text-gray-900 focus:ring-prime-600'
-                  }`}
-                />
-                <TrendingUp className="absolute left-4 top-1/2 -translate-y-1/2 text-prime-400" size={20} />
-              </div>
-            </div>
-            {/* Same coming soon for bottom part of offers */}
-            <div className={`py-20 text-center rounded-3xl border transition-all ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white shadow-xl border-black/5'}`}>
-               <Package size={64} className="mx-auto text-prime-500/30 mb-6" />
-               <h3 className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{t('coming_soon')}</h3>
-               <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>{t('coming_soon_desc')}</p>
-            </div>
+            )}
+            {activeTab === 'products' && <ProductHub products={products} isDarkMode={isDarkMode} t={t} />}
+            {activeTab === 'orders' && <OrdersView orders={orders} isDarkMode={isDarkMode} t={t} />}
+            {activeTab === 'settings_tab' && (
+              <SettingsView 
+                isDarkMode={isDarkMode} 
+                theme={theme} 
+                setTheme={setTheme} 
+                language={language} 
+                setLanguage={setLanguage} 
+                t={t} 
+              />
+            )}
+            {activeTab === 'gaps' && <KnowledgeGaps gaps={gaps} isDarkMode={isDarkMode} t={t} handleConvertToDraft={handleConvertToDraft} />}
+            {activeTab === 'drafts' && <DraftCenter drafts={drafts} isDarkMode={isDarkMode} t={t} handleApproveDraft={handleApproveDraft} />}
+            {activeTab === 'library' && <KnowledgeBase library={library} isDarkMode={isDarkMode} t={t} />}
+            {activeTab === 'architect' && <BlueprintArchitect brandData={brandData} isDarkMode={isDarkMode} t={t} />}
+            {activeTab === 'admin' && role === 'super-admin' && <SuperAdminPanel isDarkMode={isDarkMode} t={t} />}
           </div>
-        )}
+        </ErrorBoundary>
       </main>
 
-      {isCatalogShareOpen && (
-        <CatalogShareModal 
-          isOpen={isCatalogShareOpen}
-          isDarkMode={isDarkMode}
-          t={t}
-          products={products}
-          onClose={() => setIsCatalogShareOpen(false)}
-          onShare={(selectedProducts) => {
-             const text = `Check out our best-sellers:\n` + 
-              selectedProducts.map(p => `• ${p.name} - ${p.offerPrice || p.price} BDT`).join('\n') + 
-              `\nWhich one would you like to order?`;
-             setMessageInput(text);
-             setIsCatalogShareOpen(false);
-          }}
-        />
-      )}
+      {/* Overlays */}
+      <ErrorBoundary>
+        {isOrderDraftingOpen && (
+          <div className="fixed inset-0 z-[100] flex justify-end">
+             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsOrderDraftingOpen(false)}></div>
+             <div className="relative w-full max-w-2xl bg-[#020617] h-screen shadow-2xl animate-in slide-in-from-right duration-500">
+                <OrderDrafting 
+                  onClose={() => setIsOrderDraftingOpen(false)} 
+                  isDarkMode={isDarkMode} 
+                  t={t} 
+                  selectedConvo={selectedConvo}
+                  products={products}
+                  activeBrandId={activeBrandId}
+                />
+             </div>
+          </div>
+        )}
 
-      {isOrderDraftingOpen && (
-        <OrderDrafting 
-          isDarkMode={isDarkMode} 
-          t={t} 
-          selectedConvo={selectedConvo} 
-          products={products}
-          activeBrandId={activeBrandId}
-          onClose={() => setIsOrderDraftingOpen(false)}
-        />
-      )}
-      <FollowUpModal 
-        isOpen={followUpModal.isOpen}
-        onClose={() => setFollowUpModal({ ...followUpModal, isOpen: false })}
-        onConfirm={confirmFollowAction}
-        modalData={followUpModal}
-        setModalData={setFollowUpModal}
-        isDarkMode={isDarkMode}
-        t={t}
-      />
+        {isBrandOnboardingOpen && <BrandOnboarding isOpen={isBrandOnboardingOpen} onClose={() => setIsBrandOnboardingOpen(false)} />}
+        <Lightbox {...lightbox} onClose={() => setLightbox(prev => ({ ...prev, isOpen: false }))} />
+
+        {isCatalogShareOpen && (
+          <CatalogShareModal 
+            isOpen={true}
+            onClose={() => setIsCatalogShareOpen(false)} 
+            isDarkMode={isDarkMode} 
+            t={t} 
+            products={products}
+            onShare={(selectedBatch) => {
+              const text = selectedBatch.map(p => `📦 ${p.name} - ${p.offerPrice || p.price} BDT`).join('\n');
+              setMessageInput(text);
+              setIsCatalogShareOpen(false);
+            }}
+          />
+        )}
+        {isMediaGalleryOpen && (
+          <MediaGalleryModal 
+            isOpen={true}
+            onClose={() => setIsMediaGalleryOpen(false)} 
+            isDarkMode={isDarkMode} 
+            t={t} 
+            chatMessages={chatMessages}
+            setLightbox={setLightbox}
+          />
+        )}
+        {followUpModal.isOpen && (
+          <FollowUpModal 
+            isOpen={followUpModal.isOpen} 
+            onClose={() => setFollowUpModal({ ...followUpModal, isOpen: false })} 
+            onConfirm={confirmFollowAction} 
+            modalData={followUpModal}
+            setModalData={setFollowUpModal}
+            isDarkMode={isDarkMode} 
+            t={t} 
+          />
+        )}
+      </ErrorBoundary>
+
+      <BottomNav />
     </div>
   );
 };

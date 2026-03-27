@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { GripVertical, ChevronDown, ChevronRight, Zap, Building2, Store } from 'lucide-react';
+import { GripVertical, ChevronDown, ChevronRight, Activity, Building2, Store, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { MetaIcon } from './Icons';
 import { useBrand } from '../context/BrandContext';
 
@@ -130,9 +130,13 @@ const Sidebar = ({
   handleDragOver,
   handleDragEnd,
   handleDrop,
-  brandData
+  brandData,
+  isMobileMenuOpen,
+  setIsMobileMenuOpen,
+  isFlat = false,
+  onOpenBrandOnboarding
 }) => {
-  const { brands, activeBrandId, setActiveBrandId } = useBrand();
+  const { brands, activeBrandId, setActiveBrandId, user, role, logout } = useBrand();
   const [popoverData, setPopoverData] = useState({ show: false, item: null, top: 0, type: null });
   const [isBrandSwitcherOpen, setIsBrandSwitcherOpen] = useState(false);
 
@@ -147,51 +151,74 @@ const Sidebar = ({
   };
 
   return (
-    <div className={`m-4 hidden lg:flex flex-col overflow-visible rounded-[2.5rem] border transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) shadow-[0_25px_80px_-15px_rgba(0,0,0,0.5)] relative z-50 group/sidebar ${
+    <>
+      {/* Mobile Backdrop Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[85] animate-in fade-in duration-500"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+    <div className={`fixed lg:relative inset-y-0 left-0 flex flex-col overflow-visible transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) z-[90] group/sidebar ${
       isSidebarCollapsed ? 'w-24' : 'w-72'
+    } ${
+      isMobileMenuOpen ? 'translate-x-0' : '-translate-x-[calc(100%+2rem)] lg:translate-x-0'
+    } ${
+      isFlat 
+        ? 'm-0 rounded-none border-y-0 border-l-0 border-r shadow-none' 
+        : 'm-4 rounded-[2.5rem] border shadow-[0_25px_80px_-15px_rgba(0,0,0,0.5)]'
     } ${
       isDarkMode ? 'bg-[#020617]/80 border-white/5 backdrop-blur-3xl' : 'bg-white/90 border-black/5 backdrop-blur-xl'
     }`}>
       
       {/* Scrollable Content Container */}
-      <div className="flex-1 flex flex-col overflow-y-auto overflow-x-visible p-6 scrollbar-hide relative z-10">
+      <div className="flex-1 flex flex-col overflow-y-auto overflow-x-visible p-6 pb-32 lg:pb-6 scrollbar-thin relative z-10">
         
         {/* Decorative Background Elements */}
         <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-prime-500/5 to-transparent pointer-events-none" />
         
         {/* Brand Logo & Switcher */}
-        <div className="mb-12 relative z-20">
-          <button 
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className={`flex flex-col items-center w-full pt-4 transition-all duration-500 hover:scale-105 active:scale-95 cursor-pointer ${isSidebarCollapsed ? 'scale-75' : ''}`}
-          >
-            <div className="relative group/logo mb-4">
+        <div 
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          className={`mb-12 relative z-20 cursor-pointer transition-all duration-500 ${isSidebarCollapsed ? 'hover:scale-105' : ''}`}
+        >
+          <div className="flex flex-col items-center w-full pt-4">
+            <button 
+              onClick={() => handleTabChange('home')}
+              className={`relative group/logo mb-4 transition-all duration-500 hover:scale-105 active:scale-95 cursor-pointer ${isSidebarCollapsed ? 'scale-75' : ''}`}
+            >
               <div className="absolute -inset-4 bg-prime-500 rounded-full blur-3xl opacity-20 group-hover/logo:opacity-40 transition-opacity duration-1000" />
               <div className={`relative p-4 rounded-3xl border transition-all duration-500 group-hover/logo:rotate-6 ${
                 isDarkMode ? 'bg-white/5 border-white/10 shadow-2xl shadow-prime-500/20' : 'bg-white border-black/5 shadow-xl'
               }`}>
                 <MetaIcon size={isSidebarCollapsed ? 24 : 40} />
               </div>
-            </div>
-          </button>
+            </button>
+            
+          </div>
 
           {!isSidebarCollapsed && (
             <div className="relative px-2">
               <button 
-                onClick={() => setIsBrandSwitcherOpen(!isBrandSwitcherOpen)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsBrandSwitcherOpen(!isBrandSwitcherOpen);
+                }}
                 className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${
                   isDarkMode ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-gray-50 border-black/5 hover:bg-gray-100'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-prime-500 flex items-center justify-center text-white">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white ${role === 'super-admin' ? 'bg-purple-600 animate-pulse' : 'bg-prime-500'}`}>
                     <Building2 size={16} />
                   </div>
                   <div className="text-left">
                     <p className={`text-[11px] font-black tracking-tight truncate w-32 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                       {brandData?.name ? brandData.name.toUpperCase() : 'META BIZ'}
                     </p>
-                    <p className="text-[8px] font-black uppercase tracking-widest text-gray-500">{t('certified_brand')}</p>
+                    <p className={`text-[8px] font-black uppercase tracking-widest ${role === 'super-admin' ? 'text-purple-500' : 'text-gray-500'}`}>
+                      {role === 'super-admin' ? 'SYSTEM MASTER' : t('certified_brand')}
+                    </p>
                   </div>
                 </div>
                 <ChevronDown size={14} className={`text-gray-500 transition-transform ${isBrandSwitcherOpen ? 'rotate-180' : ''}`} />
@@ -214,12 +241,18 @@ const Sidebar = ({
                       >
                         <Store size={14} />
                         <span className="text-[10px] font-black uppercase tracking-widest">{b.name}</span>
-                        {activeBrandId === b.id && <Zap size={10} className="ml-auto" />}
+                        {activeBrandId === b.id && <Activity size={10} className="ml-auto" />}
                       </button>
                     )) : (
                       <p className="p-4 text-[10px] text-gray-500 text-center uppercase tracking-widest italic">No other brands</p>
                     )}
-                    <button className="w-full mt-2 p-3 rounded-xl border border-dashed border-white/10 text-gray-500 text-[9px] font-black uppercase tracking-widest hover:text-white hover:border-white/30 transition-all">
+                    <button 
+                      onClick={() => {
+                        setIsBrandSwitcherOpen(false);
+                        onOpenBrandOnboarding();
+                      }}
+                      className="w-full mt-2 p-3 rounded-xl border border-dashed border-white/10 text-gray-500 text-[9px] font-black uppercase tracking-widest hover:text-white hover:border-white/30 transition-all"
+                    >
                       + Add New Brand
                     </button>
                   </div>
@@ -263,8 +296,8 @@ const Sidebar = ({
                   })}
                   onLeave={() => setPopoverData(prev => ({ ...prev, show: false }))}
                   onClick={() => {
-                    if (hasSub && !isSidebarCollapsed) toggleMenu(item.id);
-                    else handleTabChange(item.id);
+                    handleTabChange(item.id); // Navigate to Hub
+                    if (hasSub && !isSidebarCollapsed) toggleMenu(item.id); // Toggle submenu
                   }}
                 >
                   <div className="flex items-center gap-4 min-w-0">
@@ -324,7 +357,7 @@ const Sidebar = ({
                             </div>
                             <span className="truncate">{t(subItem.label)}</span>
                           </div>
-                          {activeTab === subItem.id && <Zap size={10} className="text-prime-400 animate-pulse" />}
+                          {activeTab === subItem.id && <Activity size={10} className="text-prime-400 animate-pulse" />}
                         </button>
                       </div>
                     ))}
@@ -335,9 +368,71 @@ const Sidebar = ({
           })}
         </nav>
 
+        {/* Subscription Health Banner */}
+        {!isSidebarCollapsed && brandData && (
+          <div className="mx-2 mt-4 p-4 rounded-3xl bg-gradient-to-br from-white/5 to-transparent border border-white/5 group/sub shadow-2xl">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck size={14} className="text-prime-400" />
+                <span className="text-[9px] font-black uppercase tracking-widest text-white/50 group-hover/sub:text-prime-400 transition-colors">Plan Health</span>
+              </div>
+              <span className="text-[8px] font-black px-2 py-0.5 rounded-lg bg-prime-500/20 text-prime-400 uppercase">
+                {brandData?.plan?.replace('_', ' ') || 'Free Starter'}
+              </span>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-[8px] font-black uppercase tracking-tighter opacity-40 text-white">
+                  <span>Order Capacity</span>
+                  <span>{Math.round(((brandData?.usageStats?.ordersThisMonth || 0) / (brandData?.usageLimits?.maxOrders || 50)) * 100)}%</span>
+                </div>
+                <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-1000 ${
+                      ((brandData?.usageStats?.ordersThisMonth || 0) / (brandData?.usageLimits?.maxOrders || 50)) > 0.9 ? 'bg-rose-500' : 'bg-prime-500'
+                    }`}
+                    style={{ width: `${Math.min(100, ((brandData?.usageStats?.ordersThisMonth || 0) / (brandData?.usageLimits?.maxOrders || 50)) * 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[7px] font-black uppercase tracking-[0.2em] text-gray-500 italic">
+                <span>Expires</span>
+                <span>
+                  {(() => {
+                    try {
+                      const exp = brandData.planExpiry;
+                      if (!exp) return 'Active';
+                      const date = exp?.seconds ? new Date(exp.seconds * 1000) : new Date(exp);
+                      return isNaN(date.getTime()) ? 'Active' : date.toLocaleDateString();
+                    } catch (e) {
+                      return 'Active';
+                    }
+                  })()}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Footer Branding */}
-        <div className={`mt-10 pt-8 border-t border-white/5 text-center transition-all duration-500 ${isSidebarCollapsed ? 'opacity-0' : 'opacity-100'}`}>
-          <p className="text-[8px] font-black uppercase tracking-[0.5em] opacity-20">{t('vortex_engine')} • v2.4</p>
+        <div className={`mt-6 pt-6 border-t border-white/5 transition-all duration-500 ${isSidebarCollapsed ? 'opacity-0' : 'opacity-100'}`}>
+          <div className="flex items-center gap-3 mb-6 px-2">
+            <div className="w-10 h-10 rounded-xl bg-prime-500 flex items-center justify-center text-white font-black text-xs">
+              {user?.email?.[0].toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-[10px] font-black truncate text-gray-400">{user?.email}</p>
+              <button 
+                onClick={logout}
+                className="text-[9px] font-black text-red-500 uppercase tracking-widest hover:underline block mt-1"
+              >
+                Logout Engine
+              </button>
+            </div>
+          </div>
+          <div className="h-20 lg:hidden" />
         </div>
       </div>
 
@@ -363,6 +458,7 @@ const Sidebar = ({
         )
       )}
     </div>
+    </>
   );
 };
 

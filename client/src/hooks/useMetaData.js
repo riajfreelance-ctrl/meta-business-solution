@@ -53,7 +53,16 @@ export const useMetaData = () => {
 
   const [commentDrafts, setCommentDrafts] = useState([]);
   const [pendingComments, setPendingComments] = useState([]);
+  const [orders, setOrders] = useState([]);
 
+  useEffect(() => {
+    if (!activeBrandId) return;
+    const q = query(collection(db, "orders"), where("brandId", "==", activeBrandId));
+    return onSnapshot(q, (snapshot) => {
+      setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+  }, [activeBrandId]);
+  
   useEffect(() => {
     if (!activeBrandId) return;
     const q = query(collection(db, "comment_drafts"), where("brandId", "==", activeBrandId));
@@ -70,5 +79,5 @@ export const useMetaData = () => {
     });
   }, [activeBrandId]);
 
-  return { gaps, drafts, library, products, conversations, commentDrafts, pendingComments };
+  return { gaps, drafts, library, products, conversations, commentDrafts, pendingComments, orders };
 };

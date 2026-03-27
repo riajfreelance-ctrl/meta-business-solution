@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserCircle, Zap, CheckCircle } from 'lucide-react';
+import { UserCircle, Activity, CheckCircle } from 'lucide-react';
 import { db } from '../../firebase-client';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useBrand } from '../../context/BrandContext';
@@ -125,7 +125,7 @@ const BlueprintArchitect = ({ isDarkMode, t }) => {
         return (
           <section className="space-y-6 animate-in slide-in-from-right duration-300">
             <label className="text-xl font-bold flex items-center gap-3">
-              <Zap className="text-prime-500" />
+              <Activity className="text-prime-500" />
               2. Auto-Reply Delay
             </label>
             <p className="text-gray-400 text-sm italic">How long should the AI wait before sending a reply?</p>
@@ -327,7 +327,7 @@ const BlueprintArchitect = ({ isDarkMode, t }) => {
         return (
           <section className="space-y-8 animate-in zoom-in duration-500 text-center py-10">
             <div className="w-24 h-24 bg-prime-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Zap size={48} className="text-prime-400" />
+              <Activity size={48} className="text-prime-400" />
             </div>
             <h4 className="text-3xl font-black">All Set!</h4>
             <p className="text-gray-400 max-w-sm mx-auto">Your brand blueprint is ready. Click finalize to activate the AI with these settings.</p>
@@ -388,7 +388,7 @@ const BlueprintArchitect = ({ isDarkMode, t }) => {
             className="btn-primary px-12 py-4 rounded-2xl flex items-center gap-3 font-black uppercase tracking-widest text-sm shadow-2xl shadow-prime-500/20 active:scale-95 transition-all"
           >
             {isSaving ? 'Processing...' : step === 10 ? 'Finalize' : 'Lock & Next'}
-            <Zap size={18} className={isSaving ? 'animate-spin' : ''} />
+            <Activity size={18} className={isSaving ? 'animate-spin' : ''} />
           </button>
         </div>
       </div>

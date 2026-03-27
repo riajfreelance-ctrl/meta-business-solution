@@ -1,173 +1,206 @@
-import React from 'react';
-import { MessageSquare, User, Zap, TrendingUp, Edit2, RefreshCw } from 'lucide-react';
-import StatCard from '../StatCard';
+import React, { useState, useEffect } from 'react';
+import { 
+  DollarSign, TrendingUp, Users, Zap, ShoppingBag, ArrowUpRight, ArrowDownRight, 
+  Activity, CheckCircle2, Clock, Globe, ShieldCheck, Target, Award, MapPin
+} from 'lucide-react';
 import { useBrand } from '../../context/BrandContext';
-import axios from 'axios';
 
-const HomeView = ({ isDarkMode, t, language, theme, stats, gaps = [] }) => {
+// ── REUSABLE UI COMPONENTS ──
+const SectionHeader = ({ title, subtitle }) => (
+  <div className="mb-4 md:mb-6">
+    <h3 className="text-lg md:text-xl font-black uppercase tracking-tighter text-white flex items-center gap-2">
+      {title}
+    </h3>
+    {subtitle && <p className="text-[10px] md:text-xs text-gray-400 font-bold uppercase tracking-widest">{subtitle}</p>}
+  </div>
+);
+
+const OwnerStatCard = ({ title, value, subtext, icon: Icon, color, trend }) => (
+  <div className="p-4 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 bg-[#0f172a] border-slate-800 shadow-sm">
+    <div className="flex justify-between items-start mb-2 md:mb-4">
+      <div className={`p-2 md:p-3 rounded-xl md:rounded-2xl ${color}`}>
+        <Icon className="w-4 h-4 md:w-5 md:h-5 text-white" />
+      </div>
+      {trend && (
+        <span className={`text-[9px] md:text-[10px] font-black uppercase tracking-widest px-1.5 py-0.5 md:px-2 md:py-1 rounded-full flex items-center gap-0.5 md:gap-1 ${trend > 0 ? 'bg-green-900/40 text-green-400' : 'bg-red-900/40 text-red-400'}`}>
+          {trend > 0 ? <ArrowUpRight size={10} className="md:w-3 md:h-3" /> : <ArrowDownRight size={10} className="md:w-3 md:h-3" />} {Math.abs(trend)}%
+        </span>
+      )}
+    </div>
+    <div>
+      <h4 className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wide mb-0.5 md:mb-1 truncate">{title}</h4>
+      <div className="text-xl md:text-3xl font-black tracking-tighter text-white truncate">{value}</div>
+      <p className="text-[8px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1 md:mt-2 truncate">{subtext}</p>
+    </div>
+  </div>
+);
+
+const FunnelStep = ({ stepName, number, percentage, color }) => (
+  <div className="flex items-center justify-between p-3 md:p-4 rounded-xl md:rounded-2xl bg-[#0f172a] border border-slate-800">
+    <div className="flex items-center gap-3 md:gap-4">
+      <div className={`w-2.5 h-2.5 md:w-3 md:h-3 rounded-full flex-shrink-0 shadow-[0_0_10px_rgba(0,0,0,0.5)]`} style={{ backgroundColor: color }} />
+      <span className="font-bold text-xs md:text-sm tracking-tight text-white line-clamp-1">{stepName}</span>
+    </div>
+    <div className="text-right flex-shrink-0">
+      <div className="font-black text-sm md:text-lg text-white">{number}</div>
+      <div className="text-[8px] md:text-[10px] text-slate-400 font-bold uppercase tracking-widest">{percentage}% Conv</div>
+    </div>
+  </div>
+);
+
+// ── MAIN CEO DASHBOARD VIEW ──
+const HomeView = ({ isDarkMode, t, language, theme }) => {
   const { activeBrandId } = useBrand();
-  const [isSyncing, setIsSyncing] = React.useState(false);
-  const [syncResult, setSyncResult] = React.useState(null);
-
-  const handleSyncHistory = async () => {
-    setIsSyncing(true);
-    setSyncResult(null);
-    try {
-      const resp = await axios.post(`${import.meta.env.VITE_API_URL}/api/sync-history`, {
-        brandId: activeBrandId
-      });
-      setSyncResult({ success: true, message: resp.data.message });
-    } catch (e) {
-      setSyncResult({ success: false, message: e.response?.data?.error || e.message });
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  // Simple sparkline path based on some trending data
-  const messagePath = "M0,40 Q10,10 20,30 T40,20 T60,35 T80,10 T100,25";
-  const leadPath = "M0,50 L10,30 L20,40 L30,20 L40,35 L50,15 L60,45 L70,25 L80,30 L90,10 L100,20";
+  
+  // Real-time greeting
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
 
   return (
-    <div className="animate-fade-in space-y-8">
-      <div className="flex justify-between items-end">
-        <div>
-          <h1 className="text-4xl font-black tracking-tight uppercase leading-none">{t('welcome')}</h1>
-          <p className="text-gray-500 mt-2 font-medium">Business health at a glance.</p>
-        </div>
-        <div className="flex gap-3">
-          {syncResult && (
-            <div className={`px-4 py-2 rounded-xl text-xs font-bold animate-in fade-in slide-in-from-right-4 ${
-              syncResult.success ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'
-            }`}>
-              {syncResult.message}
-            </div>
-          )}
-          <button 
-            onClick={handleSyncHistory}
-            disabled={isSyncing}
-            className={`flex items-center gap-2 px-6 py-2 rounded-xl font-black uppercase tracking-widest text-xs transition-all ${
-              isSyncing 
-                ? 'bg-gray-500/20 text-gray-400 cursor-not-allowed' 
-                : 'bg-prime-500 text-white hover:bg-prime-600 shadow-lg shadow-prime-500/20 active:scale-95'
-            }`}
-          >
-            <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
-            {isSyncing ? 'Syncing...' : 'Sync FB History'}
-          </button>
-          <div className="px-4 py-2 rounded-xl bg-prime-500/10 border border-prime-500/20 text-prime-500 text-xs font-black uppercase tracking-widest flex items-center">Live</div>
-        </div>
-      </div>
+    <div className="animate-in fade-in slide-in-from-bottom-8 duration-1000 space-y-6 md:space-y-8 pb-32 md:pb-8">
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard icon={MessageSquare} title="Total Messages" value={stats?.totalMessages?.toLocaleString() || "0"} color="#3B82F6" trend={12} trendLabel="+12% this week" isDarkMode={isDarkMode} theme={theme} />
-        <StatCard icon={User} title="New Leads" value={stats?.newLeads?.toString() || "0"} color="#10B981" trend={5} trendLabel="+5 Today" isDarkMode={isDarkMode} theme={theme} />
-        <StatCard icon={Zap} title="AI Automation" value={`${stats?.automationScore || 92}%`} color="#8B5CF6" trend={2} trendLabel="Stable" isDarkMode={isDarkMode} theme={theme} />
-        <StatCard icon={TrendingUp} title="Conversion" value={`${stats?.conversion || 3.2}%`} color="#F59E0B" trend={-1} trendLabel="-1% drop" isDarkMode={isDarkMode} theme={theme} />
+      {/* ── 1. EXECUTIVE BRIEFING (Header) ── */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 md:gap-6 mb-6 md:mb-10">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="relative flex h-2.5 w-2.5 md:h-3 md:w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-prime-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 md:h-3 md:w-3 bg-prime-500"></span>
+            </span>
+            <span className="text-[9px] md:text-[10px] font-black tracking-widest uppercase text-prime-400">Live Executive Feed</span>
+          </div>
+          <h1 className="text-2xl md:text-5xl font-black tracking-tighter text-white">
+             {greeting}, <br className="md:hidden" /><span className="text-transparent bg-clip-text bg-gradient-to-r from-prime-500 to-purple-500 border-b-2 md:border-b-4 border-prime-500">Owner</span>
+          </h1>
+          <p className="text-xs md:text-sm font-medium text-slate-400 mt-2 max-w-xl">
+             This is your 360° bird's-eye view. Monitoring financials, AI savings, sales funnels, and operational health in real-time.
+          </p>
+        </div>
+        
+        {/* Quick Date Toggle */}
+        <div className="flex w-full md:w-auto bg-[#0f172a] p-1 rounded-xl md:rounded-2xl shadow-inner overflow-x-auto hide-scrollbar border border-slate-800">
+          <button className="flex-1 md:flex-none px-4 md:px-6 py-2 text-[10px] md:text-xs font-black rounded-lg md:rounded-xl bg-[#1e293b] shadow-sm text-prime-400 transition-all uppercase tracking-widest whitespace-nowrap">Today</button>
+          <button className="flex-1 md:flex-none px-4 md:px-6 py-2 text-[10px] md:text-xs font-bold rounded-lg md:rounded-xl text-slate-500 hover:text-white transition-all uppercase tracking-widest whitespace-nowrap">7 Days</button>
+          <button className="flex-1 md:flex-none px-4 md:px-6 py-2 text-[10px] md:text-xs font-bold rounded-lg md:rounded-xl text-slate-500 hover:text-white transition-all uppercase tracking-widest whitespace-nowrap">30 Days</button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
-          {/* Main Analytics Chart */}
-          <div className={`p-8 rounded-[2.5rem] border ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white shadow-xl border-black/5'}`}>
-            <div className="flex justify-between items-center mb-10">
-              <div>
-                <h3 className="text-xl font-black uppercase tracking-tight">Performance Flow</h3>
-                <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest font-bold">Real-time Volume</p>
-              </div>
-              <div className="flex gap-6">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-                  <span className="text-[10px] font-black uppercase text-gray-400 tracking-tighter">Messages</span>
+      {/* ── 2. CORE FINANCIAL & GROWTH METRICS (The "Money" Row - 1x2 on Mobile) ── */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-6">
+        <OwnerStatCard title="Gross Revenue" value="৳ 1,42k" subtext="Target: ৳ 2L/D" icon={DollarSign} color="bg-gradient-to-br from-emerald-500 to-green-400" trend={18.5} />
+        <OwnerStatCard title="Total Ad Spend" value="৳ 12.4k" subtext="ROAS: 11.4x" icon={TrendingUp} color="bg-gradient-to-br from-orange-500 to-amber-400" trend={-4.2} />
+        <OwnerStatCard title="Customer ACQ" value="৳ 85" subtext="Per New Customer" icon={Target} color="bg-gradient-to-br from-rose-500 to-pink-400" trend={-12.0} />
+        <OwnerStatCard title="AI Savings" value="৳ 4,850" subtext="Draft Auto-Reply" icon={ShieldCheck} color="bg-gradient-to-br from-purple-500 to-indigo-500" trend={32.4} />
+      </div>
+
+      {/* ── 3. MIDDLE COMPLEX GRID (Funnel, Products, Audience) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 mt-6 md:mt-8">
+        
+        {/* Left Col: Master Sales Funnel (Highly detailed) */}
+        <div className="p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] border bg-[#0b1120] border-slate-800 shadow-xl shadow-black/20 flex flex-col">
+          <SectionHeader title="Sales Funnel" subtitle="Where are customers dropping off?" />
+          
+          <div className="space-y-3 md:space-y-4 mt-2 md:mt-4 flex-1">
+            <FunnelStep stepName="1. Ad Clicks" number="14.2k" percentage="100" color="#3b82f6" />
+            <FunnelStep stepName="2. Inquiries" number="3.1k" percentage="22.1" color="#8b5cf6" />
+            <FunnelStep stepName="3. Hot Leads" number="840" percentage="26.6" color="#f59e0b" />
+            <FunnelStep stepName="4. Orders Drafted" number="310" percentage="36.9" color="#ec4899" />
+            <FunnelStep stepName="5. Successful Sales" number="285" percentage="91.9" color="#10b981" />
+          </div>
+        </div>
+
+        {/* Center Col: Top Products & Inventory Alerts */}
+        <div className="p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] border bg-[#0b1120] border-slate-800 shadow-xl shadow-black/20 flex flex-col">
+          <div className="flex justify-between items-center mb-4 md:mb-6">
+            <SectionHeader title="Top Movers" subtitle="Best Selling Items Today" />
+            <div className="p-1.5 md:p-2 bg-rose-500/10 text-rose-500 rounded-lg md:rounded-xl text-[8px] md:text-[10px] font-black tracking-widest uppercase flex items-center gap-1 shrink-0 border border-rose-500/20">
+              <Zap size={10} className="md:w-3 md:h-3" /> 2 Low
+            </div>
+          </div>
+          
+          <div className="space-y-4 md:space-y-5">
+            {[
+              { name: 'Pure Vitamin C Serum', sales: 124, revenue: '৳ 62k', status: 'In Stock' },
+              { name: 'Hydrating Matte Sunscreen', sales: 85, revenue: '৳ 38.2k', status: 'Low Stock' },
+              { name: 'Organic Aloe Gel', sales: 52, revenue: '৳ 15.6k', status: 'In Stock' },
+              { name: 'Night Repair Cream', sales: 24, revenue: '৳ 26.6k', status: 'Out of Stock' }
+            ].map((prod, i) => (
+              <div key={i} className="flex justify-between items-center group cursor-pointer">
+                <div className="flex items-center gap-3 md:gap-4 truncate mr-2">
+                  <div className="w-10 h-10 md:w-12 md:h-12 flex-shrink-0 rounded-lg md:rounded-xl bg-[#1e293b] flex items-center justify-center text-sm md:text-lg font-black text-slate-500 group-hover:bg-prime-500 group-hover:text-white transition-colors border border-slate-800">
+                    #{i+1}
+                  </div>
+                  <div className="truncate">
+                    <h4 className="font-bold text-xs md:text-sm text-white truncate lg:max-w-[140px]">{prod.name}</h4>
+                    <span className={`text-[8px] md:text-[10px] font-black uppercase tracking-widest ${prod.status === 'Low Stock' ? 'text-orange-500' : prod.status === 'Out of Stock' ? 'text-red-500' : 'text-green-500'}`}>
+                      {prod.status}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                  <span className="text-[10px] font-black uppercase text-gray-400 tracking-tighter">Leads</span>
+                <div className="text-right flex-shrink-0">
+                  <div className="font-black text-xs md:text-sm text-white">{prod.sales} Sold</div>
+                  <div className="text-[10px] md:text-xs text-slate-500 font-medium">{prod.revenue}</div>
                 </div>
               </div>
+            ))}
+          </div>
+          <button className="w-full mt-4 md:mt-auto py-3 md:py-4 rounded-xl md:rounded-2xl bg-[#0f172a] hover:bg-[#1e293b] text-[10px] md:text-xs font-black uppercase tracking-widest text-white transition-colors border border-slate-800">
+            View Full Catalog
+          </button>
+        </div>
+
+        {/* Right Col: Operations & AI Health Pulse */}
+        <div className="flex flex-col gap-4 md:gap-6">
+          {/* AI vs Human Box */}
+          <div className="p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border relative overflow-hidden bg-gradient-to-br from-indigo-900/40 to-[#0b1120] border-slate-800 shadow-2xl">
+            <h3 className="text-lg md:text-xl font-black uppercase tracking-tighter mb-2 md:mb-4 text-white">AI Workload</h3>
+            <div className="flex items-end gap-2 mb-4 md:mb-6">
+              <span className="text-4xl md:text-5xl font-black tracking-tighter text-white">94.2%</span>
+              <span className="text-xs md:text-sm font-bold uppercase tracking-widest mb-1 text-slate-400">Automated</span>
             </div>
             
-            <div className="relative h-64 w-full">
-               <svg viewBox="0 0 100 60" className="w-full h-full overflow-visible drop-shadow-2xl">
-                  {/* Grid Lines */}
-                  {[0, 20, 40, 60].map(y => (
-                    <line key={y} x1="0" y1={y} x2="100" y2={y} stroke={isDarkMode ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"} strokeWidth="0.1" />
-                  ))}
-                  
-                  {/* Message Path */}
-                  <path d={messagePath} fill="none" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-draw" style={{ strokeDasharray: 300, strokeDashoffset: 0 }} />
-                  <path d={`${messagePath} L100,60 L0,60 Z`} fill="url(#blueGradient)" opacity="0.1" />
-
-                  {/* Lead Path */}
-                  <path d={leadPath} fill="none" stroke="#10B981" strokeWidth="2" strokeLinecap="round" className="animate-draw" opacity="0.8" />
-                  
-                  <defs>
-                    <linearGradient id="blueGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3B82F6" />
-                      <stop offset="100%" stopColor="transparent" />
-                    </linearGradient>
-                  </defs>
-               </svg>
-            </div>
-          </div>
-
-          <div className={`p-8 rounded-[2.5rem] border ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white shadow-lg border-black/5'}`}>
-            <h3 className="text-xl font-black uppercase tracking-tight mb-6">Trending Topics</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {(gaps.length > 0 ? gaps.slice(0,6) : [
-                { question: 'Shipping Delay', count: 120 },
-                { question: 'Vitamin C Serum', count: 85 },
-                { question: 'BOGO Offer', count: 42 }
-              ]).map((g, i) => (
-                <div key={i} className={`flex justify-between items-center p-5 rounded-3xl transition-all cursor-pointer group hover:scale-[1.02] ${isDarkMode ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'}`}>
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-2xl bg-prime-500/10 flex items-center justify-center text-prime-500 font-black text-xs">
-                      {i+1}
-                    </div>
-                    <span className="font-bold text-sm truncate max-w-[150px]">{g.question || g}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] font-black uppercase text-prime-500 block leading-none">{g.count || 20+i*5}</span>
-                    <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">{t('queries')}</span>
-                  </div>
+            <div className="space-y-2 md:space-y-3">
+              <div>
+                <div className="flex justify-between text-[10px] md:text-xs font-bold uppercase tracking-widest mb-1 opacity-80 text-white">
+                  <span>Gemini Answers</span>
+                  <span>52%</span>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-8">
-          <div className={`p-8 rounded-[2.5rem] border ${isDarkMode ? 'bg-yellow-500/5 border-yellow-500/20 shadow-[0_0_30px_rgba(245,158,11,0.05)]' : 'bg-yellow-50 border-yellow-200 shadow-sm'}`}>
-            <div className="flex items-center gap-3 mb-6 text-yellow-500">
-              <div className="p-3 rounded-2xl bg-yellow-500/10">
-                <Edit2 size={24} />
+                <div className="w-full h-1 md:h-1.5 bg-[#0f172a] rounded-full overflow-hidden"><div className="w-[52%] h-full bg-cyan-400" /></div>
               </div>
               <div>
-                <h3 className="text-lg font-black uppercase tracking-tight leading-none">{t('team_bulletin')}</h3>
-                <p className="text-[10px] text-yellow-600/60 font-black uppercase tracking-widest mt-1">Priority Internal</p>
+                <div className="flex justify-between text-[10px] md:text-xs font-bold uppercase tracking-widest mb-1 opacity-80 text-white">
+                  <span>Draft Auto-Replies</span>
+                  <span>42%</span>
+                </div>
+                <div className="w-full h-1 md:h-1.5 bg-[#0f172a] rounded-full overflow-hidden"><div className="w-[42%] h-full bg-emerald-400" /></div>
+              </div>
+              <div>
+                <div className="flex justify-between text-[10px] md:text-xs font-bold uppercase tracking-widest mb-1 opacity-80 text-white">
+                  <span>Human Overrides</span>
+                  <span>5.8%</span>
+                </div>
+                <div className="w-full h-1 md:h-1.5 bg-[#0f172a] rounded-full overflow-hidden"><div className="w-[5.8%] h-full bg-rose-400" /></div>
               </div>
             </div>
-            <textarea 
-              className={`w-full h-64 bg-transparent border-none focus:ring-0 resize-none font-medium leading-relaxed ${isDarkMode ? 'text-gray-300 placeholder:text-gray-600' : 'text-gray-700'}`}
-              placeholder={t('bulletin_placeholder')}
-              defaultValue={language === 'bn' ? "মনে রাখবেন স্টক শেষ হওয়ার আগে ভিটামিন সি সিরাম আপডেট করতে হবে! 🚀" : "Remember to update the Vitamin C stock levels before the weekend rush! 🚀"}
-            />
           </div>
 
-          <div className="p-8 rounded-[2.5rem] bg-prime-500 shadow-2xl shadow-prime-500/30 text-white relative overflow-hidden group">
-            <Zap className="absolute -right-4 -bottom-4 w-32 h-32 opacity-10 group-hover:scale-110 transition-transform duration-700" />
-            <h4 className="text-2xl font-black uppercase tracking-tighter leading-none mb-2">Architect Status</h4>
-            <p className="text-white/70 text-xs font-bold leading-tight uppercase tracking-widest mb-6">Wizard Completion</p>
-            <div className="flex items-baseline gap-1">
-              <span className="text-5xl font-black tabular-nums tracking-tighter">100</span>
-              <span className="text-xl font-black">%</span>
-            </div>
-            <div className="mt-8 h-2 w-full bg-white/10 rounded-full overflow-hidden">
-               <div className="h-full bg-white w-full shadow-[0_0_15px_rgba(255,255,255,0.8)]" />
-            </div>
+          {/* New Report: Audience Demographics Highlight */}
+          <div className="p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border flex-1 flex flex-col justify-center bg-[#0b1120] border-slate-800 shadow-sm">
+             <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-4">
+                <MapPin size={20} className="md:w-6 md:h-6 text-prime-500" />
+                <div>
+                  <h3 className="font-bold uppercase tracking-widest text-xs md:text-sm text-white">Audience Insight</h3>
+                  <p className="text-[8px] md:text-[10px] text-slate-500 font-bold tracking-widest uppercase">Demographics Report</p>
+                </div>
+             </div>
+             <p className="text-[11px] md:text-sm font-medium text-slate-300 leading-relaxed md:leading-relaxed">
+               Highest active conversion happens in <strong className="text-prime-400 font-black">Dhaka (42%)</strong> specifically with female demographics aged <strong className="text-emerald-400 font-black">18-24</strong>. 
+               WhatsApp retargeting shows +15% open rate vs last week.
+             </p>
           </div>
         </div>
       </div>
+
     </div>
   );
 };

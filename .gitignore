@@ -7,3 +7,5 @@ build/
 PRIVATE_KEYS_DO_NOT_SHARE.txt
 PRIVATE_CREDENTIALS.txt
 .vercel
+.env*.local
+server/firebase-service-account.json

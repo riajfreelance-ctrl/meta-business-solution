@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { db } from '../firebase-client';
 import { 
@@ -22,6 +22,11 @@ export const useMetaChat = (scrollToBottom, isSelectMode, selectedConvoIds, setS
   const [messageInput, setMessageInput] = useState('');
   const [isAiThinking, setIsAiThinking] = useState(false);
   const [isSyncingHistory, setIsSyncingHistory] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [optimisticMessages, setOptimisticMessages] = useState([]);
+  const [replyTo, setReplyTo] = useState(null);
+  const [editingMessage, setEditingMessage] = useState(null);
+  const lastConvoIdRef = useRef(null);
 
   // Conversations Listener
   useEffect(() => {
@@ -37,19 +42,28 @@ export const useMetaChat = (scrollToBottom, isSelectMode, selectedConvoIds, setS
     });
   }, [activeBrandId]);
 
-  // Messages Listener
+  // Messages Listener — instant jump on first load, smooth scroll after
   useEffect(() => {
     if (!selectedConvo) {
       setChatMessages([]);
+      lastConvoIdRef.current = null;
       return;
     }
     const q = query(
       collection(db, `conversations/${selectedConvo.id}/messages`), 
       orderBy("timestamp", "asc")
     );
+    const isNewConvo = lastConvoIdRef.current !== selectedConvo.id;
+    lastConvoIdRef.current = selectedConvo.id;
+    let isFirstBatch = isNewConvo;
+
     return onSnapshot(q, (snapshot) => {
-      setChatMessages(snapshot.docs.map(doc => doc.data()));
-      if (scrollToBottom) setTimeout(scrollToBottom, 50);
+      setChatMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      if (scrollToBottom) {
+        const behavior = isFirstBatch ? 'auto' : 'smooth';
+        setTimeout(() => scrollToBottom(behavior), 50);
+        isFirstBatch = false;
+      }
     });
   }, [selectedConvo, scrollToBottom]);
 
@@ -61,42 +75,108 @@ export const useMetaChat = (scrollToBottom, isSelectMode, selectedConvoIds, setS
       setSelectedConvoIds(newSelected);
       return;
     }
-    
     setSelectedConvo(convo);
     if (convo.unread) {
       await updateDoc(doc(db, "conversations", convo.id), { unread: false });
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!messageInput.trim() || !selectedConvo || !activeBrandId) return;
-    const text = messageInput;
-    setMessageInput('');
+  const handleSendMessage = async (attachedFiles = [], setAttachedFiles = () => {}, productCard = null) => {
+    if ((!messageInput.trim() && attachedFiles.length === 0 && !productCard) || !selectedConvo || !activeBrandId) return;
     
-    try {
-      // 1. Persist to local Firestore for immediate UI update
-      await addDoc(collection(db, `conversations/${selectedConvo.id}/messages`), {
-        text,
-        type: 'sent',
-        brandId: activeBrandId,
-        timestamp: serverTimestamp(),
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      });
-      await updateDoc(doc(db, "conversations", selectedConvo.id), {
-        lastMessage: text,
-        brandId: activeBrandId,
-        timestamp: serverTimestamp()
-      });
+    setIsSending(true);
+    const text = messageInput;
+    const filesToSend = [...attachedFiles];
+    const tempId = Date.now().toString();
 
-      // 2. Call Backend to Send to Facebook
-      await axios.post(`${import.meta.env.VITE_API_URL}/api/messages/send`, {
-        psid: selectedConvo.id,
-        text,
-        brandId: activeBrandId
-      });
+    // Optimistic update
+    const localOptimisticMsg = {
+      id: tempId,
+      text,
+      attachments: filesToSend.map(file => ({
+        type: 'image',
+        payload: { url: URL.createObjectURL(file), isLocal: true }
+      })),
+      productCard,
+      type: 'sent',
+      brandId: activeBrandId,
+      timestamp: { seconds: Date.now() / 1000 },
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isOptimistic: true
+    };
+    setOptimisticMessages(prev => [...prev, localOptimisticMsg]);
+    setMessageInput('');
+    setAttachedFiles([]);
+    setIsSending(false);
+
+    try {
+      let attachments = [];
+      for (const file of filesToSend) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('brandId', activeBrandId);
+        const uploadResp = await axios.post(`${import.meta.env.VITE_API_URL}/api/upload`, formData);
+        if (uploadResp.data.success) {
+          attachments.push({ type: 'image', payload: { url: uploadResp.data.url } });
+        }
+      }
+
+      if (editingMessage) {
+        await updateDoc(doc(db, `conversations/${selectedConvo.id}/messages`, editingMessage.id), {
+          text, attachments, isEdited: true, updatedAt: serverTimestamp()
+        });
+      } else {
+        const msgData = {
+          text, attachments, productCard, type: 'sent', brandId: activeBrandId,
+          timestamp: serverTimestamp(),
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        if (replyTo) {
+          msgData.replyTo = { id: replyTo.id, text: replyTo.text, type: replyTo.type };
+        }
+        await addDoc(collection(db, `conversations/${selectedConvo.id}/messages`), msgData);
+        await updateDoc(doc(db, "conversations", selectedConvo.id), {
+          lastMessage: attachments.length > 0 ? (text ? `${text} (Image)` : 'Sent an image') : (productCard ? `📦 ${productCard.name}` : text),
+          brandId: activeBrandId, timestamp: serverTimestamp()
+        });
+      }
+
+      if (!editingMessage) {
+        const isWhatsApp = selectedConvo.platform === 'whatsapp';
+        const endpoint = isWhatsApp ? `${import.meta.env.VITE_API_URL}/api/whatsapp/send` : `${import.meta.env.VITE_API_URL}/api/messages/send`;
+        await axios.post(endpoint, { recipientId: selectedConvo.id, text, attachments, brandId: activeBrandId, replyToId: replyTo?.id });
+      }
+
+      setTimeout(() => {
+        setOptimisticMessages(prev => prev.filter(m => m.id !== tempId));
+      }, 2000);
     } catch (e) { 
-      console.error("Error sending message:", e); 
+      console.error("Send Error:", e); 
+      setOptimisticMessages(prev => prev.filter(m => m.id !== tempId));
+    } finally {
+      setReplyTo(null);
+      setEditingMessage(null);
     }
+  };
+
+  const handleDeleteMessage = async (msgId) => {
+    if (!window.confirm("এই মেসেজটি মুছতে চান?")) return;
+    try {
+      await updateDoc(doc(db, `conversations/${selectedConvo.id}/messages`, msgId), {
+        isDeleted: true, text: "This message was unsent.", attachments: []
+      });
+    } catch (e) { console.error("Delete Error:", e); }
+  };
+
+  const startEditMessage = (msg) => {
+    setEditingMessage(msg);
+    setMessageInput(msg.text || '');
+  };
+
+  const cancelInteractions = () => {
+    setReplyTo(null);
+    setEditingMessage(null);
+    if (editingMessage) setMessageInput('');
   };
 
   const syncHistory = async (convoId) => {
@@ -114,17 +194,10 @@ export const useMetaChat = (scrollToBottom, isSelectMode, selectedConvoIds, setS
   };
 
   return {
-    conversations,
-    selectedConvo,
-    setSelectedConvo,
-    chatMessages,
-    messageInput,
-    setMessageInput,
-    isAiThinking,
-    isSyncingHistory,
-    handleSelectConvo,
-    handleSendMessage,
-    syncHistory,
-    handleSuggestReply
+    conversations, selectedConvo, setSelectedConvo, chatMessages,
+    messageInput, setMessageInput, isAiThinking, isSyncingHistory, isSending,
+    optimisticMessages, replyTo, setReplyTo, editingMessage,
+    startEditMessage, handleDeleteMessage, cancelInteractions,
+    handleSelectConvo, handleSendMessage, syncHistory, handleSuggestReply
   };
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, CheckCircle, Trash2, Zap, XCircle, Edit3, Layers, Cpu, PlusCircle } from 'lucide-react';
+import { MessageSquare, CheckCircle, Trash2, Zap, XCircle, Edit3, Layers, Cpu, PlusCircle, Settings, Globe, ShieldCheck } from 'lucide-react';
 import { db } from '../../firebase-client';
 import { doc, updateDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import ActionMenu from '../Shared/ActionMenu';
@@ -10,7 +10,7 @@ const DraftCenter = ({
   isDarkMode, t, drafts, language, handleApproveDraft, 
   handleExpandKeywords, expandingId, toggleVariation 
 }) => {
-  const { activeBrandId } = useBrand();
+  const { activeBrandId, activeBrand, brandDocRef } = useBrand(); // Assuming useBrand provides brand doc update methods
   const [editingDraft, setEditingDraft] = useState(null);
   const [deletingDraftId, setDeletingDraftId] = useState(null);
   const [selectedDetailDraft, setSelectedDetailDraft] = useState(null);
@@ -18,6 +18,7 @@ const DraftCenter = ({
   const [addForm, setAddForm] = useState({ keyword: '', result: '' });
   const [editForm, setEditForm] = useState({ keyword: '', result: '' });
   const [selectedDrafts, setSelectedDrafts] = useState(new Set());
+  const [activeTab, setActiveTab] = useState('approved'); // 'approved' or 'pending'
 
   const toggleSelect = (id) => {
     const newSelected = new Set(selectedDrafts);
@@ -89,6 +90,18 @@ const DraftCenter = ({
     }
   };
 
+  const toggleLinguisticAutomation = async () => {
+    if (!activeBrandId) return;
+    try {
+      const brandRef = doc(db, "brands", activeBrandId);
+      await updateDoc(brandRef, {
+        autoHyperIndex: activeBrand?.autoHyperIndex === false ? true : false
+      });
+    } catch (error) {
+      console.error("Error toggling automation:", error);
+    }
+  };
+
   const removeVariation = async (draftId, variationToRemove) => {
     try {
       const draftRef = doc(db, "draft_replies", draftId);
@@ -117,6 +130,47 @@ const DraftCenter = ({
   };
   return (
     <div className="animate-fade-in space-y-6">
+      {/* Header & Controls */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className={`text-2xl font-bold flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+            <Layers className="w-8 h-8 text-indigo-500" />
+            Meta Growth: Draft Center
+            <span className="text-xs font-normal px-2 py-1 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+              Peak Intelligence
+            </span>
+          </h1>
+          <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'} mt-1`}>
+            Manage autonomous rules and AI-generated suggestions.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Linguistic Intelligence Toggle */}
+          <button 
+            onClick={toggleLinguisticAutomation}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all duration-300 ${
+              activeBrand?.autoHyperIndex !== false
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500 shadow-lg shadow-emerald-500/10'
+                : 'bg-gray-500/10 border-gray-500/30 text-gray-500'
+            }`}
+          >
+            <Cpu className={`w-4 h-4 ${activeBrand?.autoHyperIndex !== false ? 'animate-pulse' : ''}`} />
+            <span className="text-sm font-medium">
+              {activeBrand?.autoHyperIndex !== false ? 'Auto-Expansion: ON' : 'Auto-Expansion: OFF'}
+            </span>
+          </button>
+
+          <button 
+            onClick={() => setIsAddingDraft(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all shadow-lg shadow-indigo-600/20 text-sm font-medium"
+          >
+            <PlusCircle className="w-4 h-4" />
+            Add New Rule
+          </button>
+        </div>
+      </div>
+
       <div className="flex justify-between items-end mb-2">
         <div className="flex items-center gap-6">
           <div>
@@ -135,6 +189,28 @@ const DraftCenter = ({
              <PlusCircle size={14} />
              Manual Entry
           </button>
+        </div>
+
+        <div className="flex items-center gap-1 p-1 bg-white/5 border border-white/5 rounded-2xl">
+           <button 
+             onClick={() => setActiveTab('approved')}
+             className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+               activeTab === 'approved' ? 'bg-prime-500 text-white shadow-lg shadow-prime-500/20' : 'text-gray-500 hover:text-gray-300'
+             }`}
+           >
+             Active Rules
+           </button>
+           <button 
+             onClick={() => setActiveTab('pending')}
+             className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${
+               activeTab === 'pending' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-gray-500 hover:text-gray-300'
+             }`}
+           >
+             Suggestions
+             {drafts.filter(d => d.status === 'pending').length > 0 && (
+               <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+             )}
+           </button>
         </div>
 
         {selectedDrafts.size > 0 && (
@@ -188,20 +264,21 @@ const DraftCenter = ({
               </th>
               <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('keyword')}</th>
               <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('answer')}</th>
+              <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Success</th>
               <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">Variations</th>
               <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {drafts.length === 0 ? (
+            {drafts.filter(d => (activeTab === 'pending' ? d.status === 'pending' : d.status !== 'pending')).length === 0 ? (
               <tr>
-                <td colSpan="5" className="p-12 text-center text-gray-500">
+                <td colSpan="6" className="p-12 text-center text-gray-500">
                   <MessageSquare size={32} className="mx-auto mb-3 opacity-20" />
-                  No new drafts captured.
+                  No {activeTab} drafts found.
                 </td>
               </tr>
             ) : (
-              drafts.map((draft) => (
+              drafts.filter(d => (activeTab === 'pending' ? d.status === 'pending' : d.status !== 'pending')).map((draft) => (
                 <tr 
                   key={draft.id} 
                   onClick={() => setSelectedDetailDraft(draft)}
@@ -228,17 +305,28 @@ const DraftCenter = ({
                       <div className="flex items-center gap-3">
                          <span className={`text-sm font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{draft.keyword}</span>
                       </div>
-                      {draft.type === 'auto_learned' && (
-                        <div className="flex">
+                      <div className="flex gap-1 flex-wrap">
+                        {draft.type === 'auto_learned' && (
                           <span className="bg-prime-500/10 text-prime-400 px-1.5 py-0.5 rounded border border-prime-500/20 text-[7px] font-black uppercase tracking-widest">
                             Auto-Learned
                           </span>
-                        </div>
-                      )}
+                        )}
+                        {(draft.successCount || 0) >= 5 && (
+                          <span className="bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded border border-amber-500/20 text-[7px] font-black uppercase tracking-widest flex items-center gap-1">
+                            👑 Top Performer
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="p-5 max-w-xs lg:max-w-md">
                     <p className={`text-xs font-medium line-clamp-1 italic ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>"{draft.result}"</p>
+                  </td>
+                  <td className="p-5">
+                    <div className="flex flex-col">
+                      <span className={`text-sm font-black ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{draft.successCount || 0}</span>
+                      <span className="text-[8px] font-black uppercase text-gray-500">Orders</span>
+                    </div>
                   </td>
                   <td className="p-5 hidden md:table-cell">
                     <div className="flex items-center gap-2">
