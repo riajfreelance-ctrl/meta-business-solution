@@ -128,7 +128,7 @@ async function handleWebhookPost(req, res) {
         } catch (e) {
             serverLog(`[WEBHOOK TASKS ERROR] ${e.message}`);
         }
-        res.status(200).send('EVENT_RECEIVED');
+        res.status(200).send('EVENT_RECEIVED_V3');
     } else {
         res.sendStatus(404);
     }
