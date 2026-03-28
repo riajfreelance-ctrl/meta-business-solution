@@ -2,6 +2,22 @@ const { db, getBrandByPlatformId, serverTimestamp } = require('../services/fires
 const { getProfile, sendMessage, replyToComment, sendPrivateReply, getPostContent, likeComment, hideComment, sendCarouselMessage, sendSequencedMedia } = require('../services/facebookService');
 const { getDynamicModel, getDynamicVisionModel } = require('../services/geminiService');
 const { getLinguisticVariations, normalizePhonetic, cleanNoise } = require('../utils/linguisticEngine');
+const path = require('path');
+const fs = require('fs');
+const serviceAccountPath = path.join(process.cwd(), 'server', 'firebase-service-account.json');
+let serviceAccount;
+try {
+  if (fs.existsSync(serviceAccountPath)) {
+    serviceAccount = require(serviceAccountPath);
+  } else {
+    const altPath = path.join(__dirname, '..', 'firebase-service-account.json');
+    if (fs.existsSync(altPath)) {
+      serviceAccount = require(altPath);
+    }
+  }
+} catch (e) {
+  console.error('Firebase Service Account Load Error:', e.message);
+}
 const { searchVectors } = require('../services/vectorSearchService');
 const { autoTagCustomer } = require('../services/autoTagService');
 const { assignPersona, logPersonaConversion } = require('../services/splitTestService');
@@ -45,7 +61,6 @@ async function verifyWebhook(req, res) {
 async function handleWebhookPost(req, res) {
     try {
         // 0. Heart-beat log for debugging
-        const { db } = require('../services/firestoreService');
         await db.collection('system_hits').add({ path: '/webhook', timestamp: Date.now() }).catch((err) => {
             console.error('DIAGNOSTICS ERROR:', err.message);
         });
@@ -117,13 +132,13 @@ async function handleWebhookPost(req, res) {
             }
 
             await Promise.allSettled(tasks);
-            res.status(200).send('EVENT_RECEIVED_V4');
+            res.status(200).send('EVENT_RECEIVED');
         } else {
             res.sendStatus(404);
         }
     } catch (e) {
         console.error('[CRITICAL] Webhook Error:', e.message);
-        res.status(200).send('EVENT_RECEIVED_ERROR'); // Still return 200 to Meta
+        res.status(200).send('EVENT_RECEIVED'); // Always 200 for Meta
     }
 }
 

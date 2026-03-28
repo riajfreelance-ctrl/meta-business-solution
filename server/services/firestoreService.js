@@ -8,9 +8,23 @@ require('dotenv').config();
 const serviceAccountPath = path.join(process.cwd(), 'server', 'firebase-service-account.json');
 let serviceAccount;
 try {
-  serviceAccount = require(serviceAccountPath);
+  if (fs.existsSync(serviceAccountPath)) {
+    serviceAccount = require(serviceAccountPath);
+  } else {
+    // Try relative fallback for some Vercel structures
+    const altPath = path.join(__dirname, '..', 'firebase-service-account.json');
+    if (fs.existsSync(altPath)) {
+      serviceAccount = require(altPath);
+    } else {
+       // Deeply alternative path check for internal bundling
+       const bundlePath = path.join(__dirname, 'firebase-service-account.json');
+       if (fs.existsSync(bundlePath)) {
+          serviceAccount = require(bundlePath);
+       }
+    }
+  }
 } catch (e) {
-  console.warn('Firebase Service Account JSON not found via require:', e.message);
+  console.error('Firebase Service Account Load Error:', e.message);
 }
 
 if (!admin.apps.length) {
