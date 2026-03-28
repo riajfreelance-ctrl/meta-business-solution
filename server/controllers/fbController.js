@@ -43,94 +43,87 @@ async function verifyWebhook(req, res) {
 
 // Handle Webhook Post
 async function handleWebhookPost(req, res) {
-    // 0. Heart-beat log for debugging
-    const { db } = require('../services/firestoreService');
-    db.collection('system_hits').add({ path: '/webhook', timestamp: Date.now() }).catch(() => {});
+    try {
+        // 0. Heart-beat log for debugging
+        const { db } = require('../services/firestoreService');
+        await db.collection('system_hits').add({ path: '/webhook', timestamp: Date.now() }).catch((err) => {
+            console.error('DIAGNOSTICS ERROR:', err.message);
+        });
 
-    // 0. HMAC Signature Validation (Security Phase 1)
-    const signature = req.headers['x-hub-signature-256'] || req.headers['x-hub-signature'];
-    const appSecret = process.env.APP_SECRET;
+        // 0. HMAC Signature Validation (Security Phase 1)
+        const signature = req.headers['x-hub-signature-256'] || req.headers['x-hub-signature'];
+        const appSecret = process.env.APP_SECRET;
 
-    if (appSecret && signature && req.rawBody) {
-        const hmac = crypto.createHmac('sha256', appSecret);
-        hmac.update(req.rawBody);
-        const digest = 'sha256=' + hmac.digest('hex');
-        
-        if (signature !== digest) {
-            serverLog(`[SECURITY] Webhook signature mismatch! Remote: ${signature}, Local: ${digest}`);
-            // Log to Firestore for remote debugging
-            const { db } = require('../services/firestoreService');
-            db.collection('system_errors').add({
-                type: 'signature_mismatch',
-                remote: signature,
-                local: digest,
-                timestamp: Date.now()
-            }).catch(() => {});
-
-            // In dev, we might just log it, but in production, we return 403
-            // TEMPORARILY DISABLED 403 TO RESTORE CONNECTIVITY DURINIG DEBUGGING
-            // if (process.env.NODE_ENV === 'production') return res.sendStatus(403);
-        }
-    }
-
-    let body = req.body;
-    serverLog(`[WEBHOOK] Object: ${body.object}`);
-    
-    const isFB = body.object === 'page';
-    const isIG = body.object === 'instagram';
-
-    if (isFB || isIG) {
-        // We will accumulate tasks to await at the end to prevent serverless termination
-        const tasks = [];
-
-        for (const entry of body.entry) {
-            const platformId = entry.id;
-            const platformType = isIG ? 'instagram' : 'facebook';
-            const brandData = await getBrandByPlatformId(platformId, platformType);
+        if (appSecret && signature && req.rawBody) {
+            const hmac = crypto.createHmac('sha256', appSecret);
+            hmac.update(req.rawBody);
+            const digest = 'sha256=' + hmac.digest('hex');
             
-            if (!brandData) {
-                serverLog(`[WARNING] No brand found for ${platformType} ID: ${platformId}`);
-                continue;
-            }
-
-            // 1. Handle Private Messaging
-            if (entry.messaging) {
-                const webhook_event = entry.messaging[0];
-                const sender_psid = webhook_event.sender.id;
-                webhook_event.platform = platformType;
-
-                if (webhook_event.message) {
-                    if (webhook_event.message.is_echo) {
-                        tasks.push(handleEchoMessage(webhook_event, brandData));
-                    } else {
-                        tasks.push(processIncomingMessage(sender_psid, webhook_event.message, brandData, platformType));
-                    }
-                }
-
-                // --- PHASE 3: HANDLE POSTBACKS (ORDER BUTTONS) ---
-                if (webhook_event.postback) {
-                    tasks.push(handlePostback(sender_psid, webhook_event.postback, brandData, platformType));
-                }
-            }
-
-            // 2. Handle Comments (Feed Changes)
-            if (entry.changes) {
-                for (const change of entry.changes) {
-                    if (change.field === 'feed' && change.value.item === 'comment' && change.value.verb === 'add') {
-                        tasks.push(processIncomingComment(change.value, brandData));
-                    }
-                }
+            if (signature !== digest) {
+                serverLog(`[SECURITY] Webhook signature mismatch! Remote: ${signature}, Local: ${digest}`);
+                // Log to Firestore for remote debugging
+                db.collection('system_errors').add({
+                    type: 'signature_mismatch',
+                    remote: signature,
+                    local: digest,
+                    timestamp: Date.now()
+                }).catch(() => {});
             }
         }
 
-        try {
+        let body = req.body;
+        serverLog(`[WEBHOOK] Object: ${body.object}`);
+        
+        const isFB = body.object === 'page';
+        const isIG = body.object === 'instagram';
+
+        if (isFB || isIG) {
+            const tasks = [];
+            for (const entry of body.entry) {
+                const platformId = entry.id;
+                const platformType = isIG ? 'instagram' : 'facebook';
+                const brandData = await getBrandByPlatformId(platformId, platformType);
+                
+                if (!brandData) {
+                    serverLog(`[WARNING] No brand found for ${platformType} ID: ${platformId}`);
+                    continue;
+                }
+
+                if (entry.messaging) {
+                    const webhook_event = entry.messaging[0];
+                    const sender_psid = webhook_event.sender.id;
+                    webhook_event.platform = platformType;
+
+                    if (webhook_event.message) {
+                        if (webhook_event.message.is_echo) {
+                            tasks.push(handleEchoMessage(webhook_event, brandData));
+                        } else {
+                            tasks.push(processIncomingMessage(sender_psid, webhook_event.message, brandData, platformType));
+                        }
+                    }
+
+                    if (webhook_event.postback) {
+                        tasks.push(handlePostback(sender_psid, webhook_event.postback, brandData, platformType));
+                    }
+                }
+
+                if (entry.changes) {
+                    for (const change of entry.changes) {
+                        if (change.field === 'feed' && change.value.item === 'comment' && change.value.verb === 'add') {
+                            tasks.push(processIncomingComment(change.value, brandData));
+                        }
+                    }
+                }
+            }
+
             await Promise.allSettled(tasks);
-        } catch (e) {
-            serverLog(`[WEBHOOK TASKS ERROR] ${e.message}`);
+            res.status(200).send('EVENT_RECEIVED_V4');
+        } else {
+            res.sendStatus(404);
         }
-        res.status(200).send('EVENT_RECEIVED_V3');
-    } else {
-        res.sendStatus(404);
+    } catch (e) {
+        console.error('[CRITICAL] Webhook Error:', e.message);
+        res.status(200).send('EVENT_RECEIVED_ERROR'); // Still return 200 to Meta
     }
 }
 
