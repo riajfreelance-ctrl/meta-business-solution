@@ -47,13 +47,7 @@ app.get('/api/webhook', fbController.verifyWebhook); // Safety for both paths
 app.post('/api/webhook', fbController.handleWebhookPost); // Safety for both paths
 
 app.get('/api/ping', async (req, res) => {
-  try {
-    const { db } = require('./services/firestoreService');
-    const snap = await db.collection('brands').limit(1).get();
-    res.json({ status: 'ok', brands: snap.size, env: process.env.NODE_ENV });
-  } catch (e) {
-    res.status(500).json({ status: 'error', message: e.message });
-  }
+    return res.json({ status: 'pong', time: Date.now() });
 });
 
 app.use('/api', fbRoutes);
