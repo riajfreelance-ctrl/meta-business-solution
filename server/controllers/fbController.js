@@ -995,7 +995,7 @@ async function logUserMessage(psid, message, brandData, platformType = 'facebook
         platform: platformType,
         name: `${profile.first_name || ''} ${profile.last_name || ''}`,
         profilePic: profile.profile_pic || '',
-        lastMessage: message.text,
+        lastMessage: message.text || '',
         timestamp: Date.now(),
         unread: true
     };
@@ -1005,7 +1005,7 @@ async function logUserMessage(psid, message, brandData, platformType = 'facebook
 
     serverLog(`[LogMsg] Adding to messages subcollection...`);
     await db.collection(`conversations/${psid}/messages`).add({
-        text: message.text,
+        text: message.text || '',
         type: 'received',
         brandId: brandData.id,
         platform: platformType,

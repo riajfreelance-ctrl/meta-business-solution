@@ -388,7 +388,7 @@ async function logWAMessage(wa_id, text, brandData) {
         brandId: brandData.id,
         platform: 'whatsapp',
         name: currentData.name || `WA User (${wa_id})`,
-        lastMessage: text,
+        lastMessage: text || '',
         timestamp: serverTimestamp(),
         unread: true
     };
@@ -396,7 +396,7 @@ async function logWAMessage(wa_id, text, brandData) {
     await convoRef.set(updateData, { merge: true });
 
     await db.collection(`conversations/${wa_id}/messages`).add({
-        text,
+        text: text || '',
         type: 'received',
         brandId: brandData.id,
         platform: 'whatsapp',
