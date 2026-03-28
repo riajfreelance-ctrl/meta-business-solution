@@ -1019,7 +1019,8 @@ async function logUserMessage(psid, message, brandData, platformType = 'facebook
         type: 'received',
         brandId: brandData.id,
         platform: platformType,
-        timestamp: serverTimestamp()
+        timestamp: serverTimestamp(),
+        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Dhaka' })
     });
 
     serverLog(`[LogMsg] Completed for ${psid}`);
