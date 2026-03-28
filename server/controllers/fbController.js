@@ -1006,7 +1006,7 @@ async function logUserMessage(psid, message, brandData, platformType = 'facebook
         name: `${profile.first_name || ''} ${profile.last_name || ''}`,
         profilePic: profile.profile_pic || '',
         lastMessage: message.text || '',
-        timestamp: Date.now(),
+        timestamp: serverTimestamp(),
         unread: true
     };
 
@@ -1019,7 +1019,7 @@ async function logUserMessage(psid, message, brandData, platformType = 'facebook
         type: 'received',
         brandId: brandData.id,
         platform: platformType,
-        timestamp: Date.now()
+        timestamp: serverTimestamp()
     });
 
     serverLog(`[LogMsg] Completed for ${psid}`);
