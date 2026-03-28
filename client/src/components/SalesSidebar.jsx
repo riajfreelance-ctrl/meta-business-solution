@@ -230,7 +230,7 @@ const SalesSidebar = ({ isDarkMode, t, selectedConvo, setSelectedConvo, chatMess
                   </div>
                   <span className="text-[10px] font-bold opacity-60 uppercase tracking-widest">{item.label}</span>
                 </div>
-                <span className={`text-xs font-black transition-colors text-right truncate pl-4 ${isDarkMode ? 'text-white' : 'text-gray-900'} ${i === 2 && !selectedConvo?.altPhone ? 'italic opacity-50' : ''}`}>
+                <span className={`text-xs font-black transition-colors text-right truncate pl-4 ${isDarkMode ? 'text-white' : 'text-gray-900'} ${i === 2 && !selectedConvo?.altPhone ? ' opacity-50' : ''}`}>
                   {item.value}
                 </span>
               </div>

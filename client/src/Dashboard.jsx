@@ -83,7 +83,7 @@ class ErrorBoundary extends React.Component {
             <AlertCircle size={40} className="text-red-500" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-5xl font-black italic tracking-tighter text-white">SYSTEM CRASH <span className="text-red-500">DETECTED</span></h2>
+            <h2 className="text-5xl font-black  tracking-tighter text-white">SYSTEM CRASH <span className="text-red-500">DETECTED</span></h2>
             <p className="text-[10px] font-black text-red-400 uppercase tracking-[0.5em] opacity-80 leading-relaxed max-w-md mx-auto">
               {this.state.error?.message || "QUANTUM LOGIC FAILURE IN COMPONENT TREE"}
             </p>
@@ -333,21 +333,37 @@ const Dashboard = () => {
     }
   }, [activeBrandId]);
 
-  const handleExpandKeywords = async (id, kw) => {
-     setExpandingId(id);
-     try {
-       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/generate_variations`, {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({ draftId: id, keyword: kw })
-       });
-       if (!response.ok) throw new Error('Generation failed');
-     } catch (e) {
-       console.error("AI Generation Error:", e);
-     } finally {
-       setExpandingId(null);
-     }
-  };
+   const handleExpandKeywords = async (id, kw) => {
+      setExpandingId(id);
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/generate_variations`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ draftId: id, keyword: kw })
+        });
+        if (!response.ok) throw new Error('Generation failed');
+      } catch (e) {
+        console.error("AI Generation Error:", e);
+      } finally {
+        setExpandingId(null);
+      }
+   };
+
+   const handleLinguisticExpand = async (id, kw) => {
+      setExpandingId(id);
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/generate_linguistic_variations`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ draftId: id, keyword: kw })
+        });
+        if (!response.ok) throw new Error('Generation failed');
+      } catch (e) {
+        console.error("Linguistic Generation Error:", e);
+      } finally {
+        setExpandingId(null);
+      }
+   };
 
   const toggleVariation = async (draftId, variation, currentApproved = []) => {
     try {
@@ -469,31 +485,51 @@ const Dashboard = () => {
   );
   // --- Bottom Navigation (Mobile) ---
   const BottomNav = () => (
-    <div className={`lg:hidden fixed bottom-0 left-0 right-0 border-t z-[100] px-6 py-4 flex justify-between items-center backdrop-blur-3xl animate-in slide-in-from-bottom duration-500 ${
-      isDarkMode ? 'bg-[#020617]/80 border-white/10' : 'bg-white/90 border-black/10'
-    }`}>
-      {[
-        { id: 'home', icon: Activity },
-        { id: 'fb_inbox', icon: MessageSquare },
-        { id: 'admin', icon: ShieldCheck, show: role === 'super-admin' },
-        { id: 'settings_tab', icon: Settings },
-        { id: 'menu', icon: PanelLeft, label: 'Menu', onClick: () => setIsMobileMenuOpen(!isMobileMenuOpen) }
-      ].filter(item => item.show !== false).map(item => (
-        <button
-          key={item.id}
-          onClick={item.onClick || (() => handleTabChange(item.id))}
-          className={`relative p-3 rounded-2xl transition-all active:scale-90 ${
-            activeTab === item.id || (item.id === 'menu' && isMobileMenuOpen)
-              ? 'text-prime-400 bg-prime-500/10' 
-              : 'text-gray-500 hover:text-gray-300'
-          }`}
-        >
-          <item.icon size={22} />
-          {activeTab === item.id && (
-            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-prime-500 rounded-full shadow-[0_0_10px_rgba(139,92,246,0.8)]" />
-          )}
-        </button>
-      ))}
+    <div className="lg:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] w-[94%] max-w-[440px] animate-in fade-in slide-in-from-bottom-12 duration-1000">
+      <div className={`relative flex justify-around items-center px-3 py-2.5 rounded-[3rem] border shadow-[0_30px_60px_-15px_rgba(0,0,0,0.6)] backdrop-blur-3xl overflow-hidden ${
+        isDarkMode 
+          ? 'bg-[#0a0f1d]/85 border-white/10 shadow-black' 
+          : 'bg-white/95 border-black/5 shadow-gray-300'
+      }`}>
+        {/* Modern "Aura" Background Effect */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-prime-500/5 via-transparent to-prime-500/5 pointer-events-none" />
+        
+        {[
+          { id: 'home', icon: Activity },
+          { id: 'fb_inbox', icon: MessageSquare },
+          { id: 'admin', icon: ShieldCheck, show: role === 'super-admin' },
+          { id: 'settings_tab', icon: Settings },
+          { id: 'menu', icon: PanelLeft, label: 'Menu', onClick: () => setIsMobileMenuOpen(!isMobileMenuOpen) }
+        ].filter(item => item.show !== false).map(item => {
+          const isActive = activeTab === item.id || (item.id === 'menu' && isMobileMenuOpen);
+          return (
+            <button
+              key={item.id}
+              onClick={item.onClick || (() => handleTabChange(item.id))}
+              className={`relative flex flex-col items-center justify-center w-14 h-14 rounded-[2rem] transition-all duration-500 active:scale-75 group ${
+                isActive 
+                  ? 'text-prime-400' 
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {/* Active High-Gloss Indicator Pill */}
+              {isActive && (
+                <div className="absolute inset-1 bg-prime-500/10 rounded-[1.5rem] border border-prime-500/20 shadow-[0_0_20px_rgba(139,92,246,0.1)] animate-in zoom-in-90 duration-500" />
+              )}
+              
+              <item.icon 
+                size={22} 
+                strokeWidth={isActive ? 2.5 : 2} 
+                className={`relative z-10 transition-all duration-700 ${isActive ? 'scale-110 drop-shadow-[0_0_8px_rgba(139,92,246,0.8)]' : 'group-hover:scale-110 opacity-60'}`} 
+              />
+              
+              {isActive && (
+                <div className="absolute -bottom-1 w-1.5 h-1.5 bg-prime-500 rounded-full shadow-[0_0_15px_rgba(139,92,246,1)] animate-pulse" />
+              )}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 
@@ -549,7 +585,7 @@ const Dashboard = () => {
             <header className="flex justify-between items-center mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
               <div>
                 <h2 className={`text-4xl font-black mb-1 tracking-tighter ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{t('system_status')} <span className="text-prime-500">.</span></h2>
-                <p className="text-[10px] uppercase font-black tracking-[0.2em] opacity-40 italic">{brandData?.name} Hub • v2.4.0</p>
+                <p className="text-[10px] uppercase font-black tracking-[0.2em] opacity-40 ">{brandData?.name} Hub • v2.4.0</p>
               </div>
               <div className="relative" ref={profileRef}>
                 <button 
@@ -566,7 +602,7 @@ const Dashboard = () => {
           <GlobalBanner isDarkMode={isDarkMode} />
 
           <div className={`flex-1 flex flex-col ${activeTab === 'fb_inbox' ? 'min-h-0 h-full overflow-hidden' : ''}`}>
-            {activeTab === 'home' && <HomeView stats={stats} t={t} isDarkMode={isDarkMode} gaps={gaps} />}
+            {activeTab === 'home' && <HomeView stats={stats} t={t} isDarkMode={isDarkMode} gaps={gaps} drafts={drafts} />}
             {activeTab === 'fb_inbox' && (
               <div className="flex-1 flex flex-col min-h-0">
                 <div className="h-full flex overflow-hidden">
@@ -588,6 +624,7 @@ const Dashboard = () => {
                       <InboxList conversations={conversations} selectedConvo={selectedConvo} setSelectedConvo={handleSelectConvo} t={t} isDarkMode={isDarkMode} />
                    </div>
                    <ChatWindow 
+                    brandId={activeBrandId}
                     selectedConvo={selectedConvo} 
                     chatMessages={chatMessages} 
                     messageInput={messageInput} 
@@ -648,7 +685,16 @@ const Dashboard = () => {
               />
             )}
             {activeTab === 'gaps' && <KnowledgeGaps gaps={gaps} isDarkMode={isDarkMode} t={t} handleConvertToDraft={handleConvertToDraft} />}
-            {activeTab === 'drafts' && <DraftCenter drafts={drafts} isDarkMode={isDarkMode} t={t} handleApproveDraft={handleApproveDraft} />}
+            {activeTab === 'drafts' && <DraftCenter 
+              drafts={drafts} 
+              isDarkMode={isDarkMode} 
+              t={t} 
+              handleApproveDraft={handleApproveDraft} 
+              handleExpandKeywords={handleExpandKeywords}
+              handleLinguisticExpand={handleLinguisticExpand}
+              expandingId={expandingId}
+              toggleVariation={toggleVariation}
+            />}
             {activeTab === 'library' && <KnowledgeBase library={library} isDarkMode={isDarkMode} t={t} />}
             {activeTab === 'architect' && <BlueprintArchitect brandData={brandData} isDarkMode={isDarkMode} t={t} />}
             {activeTab === 'admin' && role === 'super-admin' && <SuperAdminPanel isDarkMode={isDarkMode} t={t} />}
@@ -706,15 +752,10 @@ const Dashboard = () => {
             isOpen={followUpModal.isOpen} 
             onClose={() => setFollowUpModal({ ...followUpModal, isOpen: false })} 
             onConfirm={confirmFollowAction} 
-            modalData={followUpModal}
-            setModalData={setFollowUpModal}
-            isDarkMode={isDarkMode} 
-            t={t} 
           />
         )}
+        <BottomNav />
       </ErrorBoundary>
-
-      <BottomNav />
     </div>
   );
 };

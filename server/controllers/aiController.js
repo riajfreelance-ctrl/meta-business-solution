@@ -25,6 +25,24 @@ async function generateVariations(req, res) {
     }
 }
 
+async function generateLinguisticVariations(req, res) {
+    const { draftId, keyword } = req.body;
+    if (!draftId || !keyword) return res.status(400).send('Missing ID or Keyword');
+
+    try {
+        const { getLinguisticVariations } = require('../utils/linguisticEngine');
+        const variations = getLinguisticVariations(keyword);
+        
+        const draftRef = db.collection('draft_replies').doc(draftId);
+        await draftRef.update({ variations: variations });
+        
+        res.json({ success: true, variations });
+    } catch (error) {
+        serverLog('LINGUISTIC VARIATION ERROR: ' + error.message);
+        res.status(500).json({ error: error.message });
+    }
+}
+
 async function discoverGaps(req, res) {
     const { brandId } = req.body;
     if (!brandId) return res.status(400).send('Missing Brand ID');
@@ -123,6 +141,7 @@ async function trainAIAssistant(req, res) {
 
 module.exports = {
     generateVariations,
+    generateLinguisticVariations,
     discoverGaps,
     trainAIAssistant
 };

@@ -130,7 +130,7 @@ const SettingsView = ({ isDarkMode, theme, setTheme, language, setLanguage, t })
             {brandData?.planExpiry && (
               <div className="text-right">
                 <p className="text-[8px] font-black uppercase tracking-widest text-gray-500 mb-1">Expires On</p>
-                <p className={`text-[10px] font-black italic ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                <p className={`text-[10px] font-black  ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                   {(() => {
                     try {
                       const exp = brandData.planExpiry;

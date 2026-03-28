@@ -506,7 +506,7 @@ const SuperAdminPanel = ({ isDarkMode, t }) => {
           {filteredBrands.length === 0 && searchTerm && (
             <div className="py-20 text-center text-slate-600">
                <AlertTriangle size={48} className="mx-auto mb-4 opacity-20" />
-               <p className="text-sm font-black italic uppercase tracking-widest mb-2">No units detected on this frequency</p>
+               <p className="text-sm font-black  uppercase tracking-widest mb-2">No units detected on this frequency</p>
                <p className="text-[10px] font-medium">Try searching for a different name, ID, or owner email.</p>
             </div>
           )}

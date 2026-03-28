@@ -75,7 +75,7 @@ const CampaignWizard = ({ isDarkMode, t, activeBrandId }) => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className={`text-2xl font-black uppercase tracking-tight italic flex items-center gap-3 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+          <h2 className={`text-2xl font-black uppercase tracking-tight  flex items-center gap-3 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
             <Target className="text-prime-500" />
             Meta Ads Growth Engine
           </h2>
@@ -199,7 +199,7 @@ const CampaignWizard = ({ isDarkMode, t, activeBrandId }) => {
               <ArrowRight size={18} />
             </button>
             
-            <p className="text-[9px] text-center opacity-40 italic">Estimated cost per message: 0.12 - 0.25 BDT</p>
+            <p className="text-[9px] text-center opacity-40 ">Estimated cost per message: 0.12 - 0.25 BDT</p>
           </div>
         </div>
 

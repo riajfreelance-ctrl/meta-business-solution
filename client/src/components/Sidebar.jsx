@@ -244,7 +244,7 @@ const Sidebar = ({
                         {activeBrandId === b.id && <Activity size={10} className="ml-auto" />}
                       </button>
                     )) : (
-                      <p className="p-4 text-[10px] text-gray-500 text-center uppercase tracking-widest italic">No other brands</p>
+                      <p className="p-4 text-[10px] text-gray-500 text-center uppercase tracking-widest ">No other brands</p>
                     )}
                     <button 
                       onClick={() => {
@@ -397,7 +397,7 @@ const Sidebar = ({
                 </div>
               </div>
 
-              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[7px] font-black uppercase tracking-[0.2em] text-gray-500 italic">
+              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[7px] font-black uppercase tracking-[0.2em] text-gray-500 ">
                 <span>Expires</span>
                 <span>
                   {(() => {

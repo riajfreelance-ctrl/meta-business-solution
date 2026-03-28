@@ -59,7 +59,7 @@ const CommentSettings = ({ isDarkMode, t, settings, handleToggleSetting, isSavin
         {isSavingSettings && (
           <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-prime-500/10 border border-prime-500/20">
             <div className="w-1 h-1 bg-prime-400 rounded-full animate-ping" />
-            <span className="text-[9px] text-prime-400 font-black uppercase tracking-widest italic leading-none">
+            <span className="text-[9px] text-prime-400 font-black uppercase tracking-widest  leading-none">
               Saving...
             </span>
           </div>

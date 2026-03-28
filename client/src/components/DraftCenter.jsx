@@ -91,7 +91,7 @@ const DraftCenter = ({
 
         <div className="space-y-4">
           {drafts.length === 0 ? (
-            <div className="py-20 text-center text-gray-500 italic border border-dashed border-white/10 rounded-3xl">No draft replies found. Let the AI discover more Knowledge Gaps first.</div>
+            <div className="py-20 text-center text-gray-500  border border-dashed border-white/10 rounded-3xl">No draft replies found. Let the AI discover more Knowledge Gaps first.</div>
           ) : (
             drafts.map((draft) => (
               <div key={draft.id} className={`p-6 rounded-3xl border transition-all duration-500 flex items-start gap-6 group hover:translate-x-1 ${
@@ -153,7 +153,7 @@ const DraftCenter = ({
                          className="w-full bg-black/20 border border-prime-500/30 rounded-lg px-3 py-2 text-xs font-bold focus:outline-none h-20 resize-none mt-1"
                        />
                      ) : (
-                       <p className={`text-xs font-medium line-clamp-2 italic opacity-70 ${refiningId === draft.id ? 'animate-pulse text-prime-400' : ''}`}>
+                       <p className={`text-xs font-medium line-clamp-2  opacity-70 ${refiningId === draft.id ? 'animate-pulse text-prime-400' : ''}`}>
                          "{draft.result}"
                        </p>
                      )}
@@ -219,11 +219,11 @@ const DraftCenter = ({
                  <div className={`p-6 rounded-2xl border ${simulationResult.source === 'none' ? 'border-red-500/30 bg-red-500/5' : 'border-green-500/30 bg-green-500/5'}`}>
                      <p className="text-[10px] font-black text-gray-500 uppercase mb-3">Result Source: {simulationResult.source}</p>
                      {simulationResult.source === 'none' ? (
-                       <p className="text-red-400 font-bold text-xs italic">No exact match found.</p>
+                       <p className="text-red-400 font-bold text-xs ">No exact match found.</p>
                      ) : (
                        <div className="space-y-2">
                           <p className="text-green-400 font-bold text-xs uppercase tracking-widest">Matched Trigger!</p>
-                          <p className="text-sm italic text-gray-300">"{simulationResult.match.answer || simulationResult.match.result}"</p>
+                          <p className="text-sm  text-gray-300">"{simulationResult.match.answer || simulationResult.match.result}"</p>
                        </div>
                      )}
                  </div>

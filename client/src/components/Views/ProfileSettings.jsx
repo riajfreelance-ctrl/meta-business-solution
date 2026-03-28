@@ -109,7 +109,7 @@ const ProfileSettings = ({ isDarkMode, t }) => {
           </div>
 
           <div className="pt-4 flex items-center justify-between">
-            <p className="text-xs text-gray-500 italic">Your email address cannot be changed for security reasons.</p>
+            <p className="text-xs text-gray-500 ">Your email address cannot be changed for security reasons.</p>
             <button className="text-xs font-black text-prime-500 hover:underline px-2 py-1">Reset Password</button>
           </div>
         </div>

@@ -80,7 +80,7 @@ const CommentModal = ({
               <PlusCircle className="text-prime-400" size={32} />
             </div>
             <div>
-              <h3 className="text-4xl font-black tracking-tighter italic">
+              <h3 className="text-4xl font-black tracking-tighter ">
                 {isEditing ? 'Refine Strategy' : 'New autonomous Strategy'}
               </h3>
               <p className="text-[11px] text-gray-500 font-black uppercase tracking-[0.3em] mt-1">
@@ -303,7 +303,7 @@ const CommentModal = ({
                     <div className="space-y-2">
                        <div className="flex items-center gap-2 mb-2 opacity-50">
                         <Globe size={11} className="text-prime-400" />
-                        <span className="text-[9px] font-black uppercase tracking-widest italic">Variation {i+1} : Public Reply</span>
+                        <span className="text-[9px] font-black uppercase tracking-widest ">Variation {i+1} : Public Reply</span>
                       </div>
                       <textarea 
                         value={v.publicReply}
@@ -327,7 +327,7 @@ const CommentModal = ({
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 mb-2 opacity-50">
                         <Send size={11} className="text-purple-400" />
-                        <span className="text-[9px] font-black uppercase tracking-widest italic">Private Inbox message</span>
+                        <span className="text-[9px] font-black uppercase tracking-widest ">Private Inbox message</span>
                       </div>
                       <textarea 
                         value={v.privateReply}

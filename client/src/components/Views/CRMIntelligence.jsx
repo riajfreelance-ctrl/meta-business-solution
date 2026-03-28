@@ -53,7 +53,7 @@ const CRMIntelligence = ({ isDarkMode, t }) => {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h2 className={`text-2xl font-black uppercase tracking-tight italic flex items-center gap-3 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+          <h2 className={`text-2xl font-black uppercase tracking-tight  flex items-center gap-3 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
             <Users className="text-prime-500" size={28} />
             CRM Intelligence
           </h2>

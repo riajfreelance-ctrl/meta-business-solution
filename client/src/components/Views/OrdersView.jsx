@@ -7,7 +7,7 @@ const OrdersView = ({ isDarkMode, t, orders = [] }) => {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h2 className={`text-3xl md:text-5xl font-black mb-2 tracking-tighter uppercase italic ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+          <h2 className={`text-3xl md:text-5xl font-black mb-2 tracking-tighter uppercase  ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
             Order <span className="text-prime-500 text-stroke-thin">Vault</span>
           </h2>
           <p className="text-[10px] font-black uppercase tracking-[0.4em] text-prime-500 mb-1 flex items-center gap-2">
@@ -42,7 +42,7 @@ const OrdersView = ({ isDarkMode, t, orders = [] }) => {
             <ShoppingCart size={48} />
           </div>
           <div>
-            <h3 className="text-2xl font-black uppercase italic italic tracking-tighter">No Active Orders found</h3>
+            <h3 className="text-2xl font-black uppercase   tracking-tighter">No Active Orders found</h3>
             <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-30 mt-2">Generate high-converting drafts from the sales hub</p>
           </div>
         </div>
@@ -68,7 +68,7 @@ const OrdersView = ({ isDarkMode, t, orders = [] }) => {
                       <User size={28} />
                     </div>
                     <div>
-                      <h4 className="font-black text-2xl tracking-tighter uppercase italic">{customer.name}</h4>
+                      <h4 className="font-black text-2xl tracking-tighter uppercase ">{customer.name}</h4>
                       <div className="flex items-center gap-3 mt-1.5 opacity-40 text-[9px] font-black uppercase tracking-[0.2em]">
                          <Clock size={12} className="text-prime-500" />
                          {order.id} • {(() => {
@@ -102,7 +102,7 @@ const OrdersView = ({ isDarkMode, t, orders = [] }) => {
                      <div className={`p-5 rounded-[2rem] border animate-in zoom-in-95 ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-gray-50'}`}>
                         <div className="flex items-center gap-2 mb-3">
                            <Ruler size={14} className="text-prime-500" />
-                           <span className="text-[10px] font-black uppercase tracking-widest opacity-40 italic">Measurements</span>
+                           <span className="text-[10px] font-black uppercase tracking-widest opacity-40 ">Measurements</span>
                         </div>
                         <div className="grid grid-cols-2 gap-x-6 gap-y-2">
                           {Object.entries(order.items.find(i => i.customMeasurements)?.customMeasurements || {}).map(([key, val]) => (
@@ -126,7 +126,7 @@ const OrdersView = ({ isDarkMode, t, orders = [] }) => {
                           <span className="text-[8px] font-black opacity-30 uppercase tracking-[0.2em]">{item.size || 'M'} • {item.color || 'STND'}</span>
                         </div>
                         <div className="h-0.5 flex-1 mx-4 border-b border-dotted border-white/10" />
-                        <span className="text-xs font-black italic">৳{ (item.price || 0) * item.quantity }</span>
+                        <span className="text-xs font-black ">৳{ (item.price || 0) * item.quantity }</span>
                       </div>
                     ))}
                   </div>
@@ -159,9 +159,9 @@ const OrdersView = ({ isDarkMode, t, orders = [] }) => {
                      <div className="flex justify-between items-center pt-6 mt-4 border-t border-white/10">
                         <div className="flex flex-col">
                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-prime-500 leading-none">Net Receivable</span>
-                           <span className="text-[8px] font-black opacity-30 uppercase mt-1 italic">Authorized Balance Due</span>
+                           <span className="text-[8px] font-black opacity-30 uppercase mt-1 ">Authorized Balance Due</span>
                         </div>
-                        <span className="text-4xl font-black tracking-tighter italic text-prime-500">৳{totals.finalDue}</span>
+                        <span className="text-4xl font-black tracking-tighter  text-prime-500">৳{totals.finalDue}</span>
                      </div>
                   </div>
                 </div>

@@ -51,14 +51,14 @@ const TrainingRow = ({ gap, isDarkMode, handleConvertToDraft, onDelete }) => {
                   onBlur={() => setIsEditingQuestion(false)}
                   onKeyDown={(e) => e.key === 'Enter' && setIsEditingQuestion(false)}
                   autoFocus
-                  className={`text-sm font-black tracking-tight leading-tight italic bg-transparent border-b-2 border-prime-500 outline-none w-full ${isDarkMode ? 'text-white' : 'text-gray-900'}`}
+                  className={`text-sm font-black tracking-tight leading-tight  bg-transparent border-b-2 border-prime-500 outline-none w-full ${isDarkMode ? 'text-white' : 'text-gray-900'}`}
                />
             ) : (
                <div 
                   className="flex items-center gap-2 group/q cursor-pointer"
                   onClick={() => setIsEditingQuestion(true)}
                >
-                  <span className={`text-sm font-black tracking-tight leading-tight italic ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  <span className={`text-sm font-black tracking-tight leading-tight  ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                      "{editedQuestion}"
                   </span>
                   <Edit3 size={10} className="text-prime-400 opacity-0 group-hover/q:opacity-100 transition-all" />
@@ -263,7 +263,7 @@ const KnowledgeGaps = ({ isDarkMode, t, gaps: initialGaps = [], handleConvertToD
                   <tr>
                      <td colSpan="3" className="p-20 text-center text-gray-500">
                         <GraduationCap size={48} className="mx-auto mb-4 opacity-10" />
-                        <p className="text-sm font-black italic">"I'm ready for anything, Boss!"</p>
+                        <p className="text-sm font-black ">"I'm ready for anything, Boss!"</p>
                         <p className="text-[9px] uppercase tracking-[0.2em] mt-2">All scenarios mastered.</p>
                      </td>
                   </tr>

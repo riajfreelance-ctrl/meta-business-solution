@@ -63,7 +63,7 @@ const SubscriptionPlan = ({ isDarkMode, t }) => {
     <div className="max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
       <div className="text-center mb-16">
         <h2 className={`text-4xl font-black tracking-tighter mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-          Scale Your <span className="text-prime-500 text-italic">Mission.</span>
+          Scale Your <span className="text-prime-500 text-">Mission.</span>
         </h2>
         <p className="text-gray-500 max-w-xl mx-auto">Choose a plan that fits your brand's growth and unlock the full power of Anzaar Engine.</p>
       </div>
@@ -124,7 +124,7 @@ const SubscriptionPlan = ({ isDarkMode, t }) => {
       <div className={`mt-16 p-8 rounded-[2.5rem] border text-center ${
         isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white border-black/5 shadow-xl'
       }`}>
-        <p className="text-gray-500 text-sm italic">
+        <p className="text-gray-500 text-sm ">
           Need a custom plan for 50+ brands? 
           <button className="ml-2 font-black text-prime-500 hover:underline">Chat with our agency team.</button>
         </p>

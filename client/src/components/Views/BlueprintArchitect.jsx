@@ -105,7 +105,7 @@ const BlueprintArchitect = ({ isDarkMode, t }) => {
                   }`}
                 >
                   <p className={`font-bold mb-1 ${tone === tName ? 'text-prime-400' : ''}`}>{tName}</p>
-                  <p className="text-xs text-gray-500 italic">Conversational style: {tName.toLowerCase()}</p>
+                  <p className="text-xs text-gray-500 ">Conversational style: {tName.toLowerCase()}</p>
                 </button>
               ))}
             </div>
@@ -128,7 +128,7 @@ const BlueprintArchitect = ({ isDarkMode, t }) => {
               <Activity className="text-prime-500" />
               2. Auto-Reply Delay
             </label>
-            <p className="text-gray-400 text-sm italic">How long should the AI wait before sending a reply?</p>
+            <p className="text-gray-400 text-sm ">How long should the AI wait before sending a reply?</p>
             <div className="grid grid-cols-2 gap-4">
               {['Immediate', '15 Seconds', '30 Seconds', '1 Minute'].map((d) => (
                 <button 
@@ -340,7 +340,7 @@ const BlueprintArchitect = ({ isDarkMode, t }) => {
           </section>
         );
       default:
-        return <div className="p-20 text-center text-gray-500 italic">Step {step} is under construction...</div>;
+        return <div className="p-20 text-center text-gray-500 ">Step {step} is under construction...</div>;
     }
   };
 

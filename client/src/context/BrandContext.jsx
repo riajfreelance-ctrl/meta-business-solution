@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { db } from '../firebase-client';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 
 const BrandContext = createContext();
 
@@ -200,9 +200,26 @@ Welcome to your elite command center. The system has automatically provisioned y
   }, [user]);
 
   useEffect(() => {
-    if (activeBrandId) {
-      fetchBrandData();
-    }
+    if (!activeBrandId) return;
+    const docRef = doc(db, "brands", activeBrandId);
+
+    setLoading(true);
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setBrandData({
+          ...data,
+          id: docSnap.id,
+          name: data.name || activeBrandId
+        });
+      }
+      setLoading(false);
+    }, (error) => {
+      console.error("Error listening to brand data:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [activeBrandId]);
 
   return (

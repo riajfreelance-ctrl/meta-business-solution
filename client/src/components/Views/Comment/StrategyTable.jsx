@@ -115,7 +115,7 @@ const StrategyTable = ({
                               <Globe size={10} className="text-prime-400" /> 
                               <span className="uppercase font-black tracking-[0.2em] text-[8px]">Public Reply</span>
                             </div>
-                            <p className="text-[11px] font-medium leading-relaxed italic mb-3">"{v.publicReply}"</p>
+                            <p className="text-[11px] font-medium leading-relaxed  mb-3">"{v.publicReply}"</p>
                             
                             {v.privateReply && (
                               <div className="pt-3 border-t border-white/5">
@@ -138,7 +138,7 @@ const StrategyTable = ({
                         {draft.variations.length > 2 && (
                           <div className="flex items-center gap-2 pl-2">
                             <MoreHorizontal size={14} className="text-gray-500 opacity-30" />
-                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-[0.15em] italic">
+                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-[0.15em] ">
                               +{draft.variations.length - 2} more optimized variations
                             </p>
                           </div>

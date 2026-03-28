@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RotateCcw, AlertCircle, Bookmark, Star, ChevronDown, Zap, Plus, ChevronRight, Package, XCircle, MessageSquare, ShoppingBag, CornerUpLeft, Edit2, Trash2, Forward, Layers } from 'lucide-react';
+import CannedResponsePanel from './CannedResponsePanel';
 
 const ChatWindow = ({ 
   isDarkMode, t, selectedConvo, chatMessages, handleSuggestReply, handleSendMessage, 
@@ -8,7 +9,8 @@ const ChatWindow = ({
   handleDeleteMessage, cancelInteractions, onForward, drafts = [], setLightbox,
   setAttachedFiles, handleFileChange, togglePriority, toggleFollowUp,
   isSyncingHistory, syncHistory, chatEndRef, onScroll, showScrollButton, scrollToBottom,
-  onOpenOrderDrafting, onOpenCatalogShare, onBack
+  onOpenOrderDrafting, onOpenCatalogShare, onBack,
+  brandId
 }) => {
   const [contextMenu, setContextMenu] = useState(null);
   const [showMacros, setShowMacros] = useState(false);
@@ -245,7 +247,7 @@ const ChatWindow = ({
                   </div>
                 )}
                 <div className={`p-4 rounded-[1.8rem] text-sm transition-all duration-300 hover:shadow-2xl relative group/bubble ${
-                  msg.isDeleted ? 'italic opacity-40 border border-dashed border-gray-500' :
+                  msg.isDeleted ? ' opacity-40 border border-dashed border-gray-500' :
                   msg.type === 'sent'
                     ? (isDarkMode 
                         ? 'bg-gradient-to-br from-prime-500 via-prime-600 to-indigo-600 text-white shadow-lg shadow-prime-500/20' 
@@ -255,7 +257,7 @@ const ChatWindow = ({
                         : 'bg-white text-gray-900 border border-black/5 shadow-sm hover:shadow-md')
                 } ${msg.isOptimistic ? 'opacity-60 scale-[0.98]' : ''}`}>
                   {msg.replyTo && (
-                    <div className="mb-3 p-3 rounded-2xl bg-black/20 border-l-4 border-prime-400 text-[10px] opacity-80 backdrop-blur-md italic flex flex-col gap-1">
+                    <div className="mb-3 p-3 rounded-2xl bg-black/20 border-l-4 border-prime-400 text-[10px] opacity-80 backdrop-blur-md  flex flex-col gap-1">
                       <span className="font-black uppercase tracking-widest opacity-40 text-[8px]">Replying to</span>
                       <span className="truncate">{msg.replyTo.text || 'Image Attachment'}</span>
                     </div>
@@ -335,7 +337,7 @@ const ChatWindow = ({
                   <div className={`w-1 h-8 rounded-full ${editingMessage ? 'bg-amber-500' : 'bg-prime-500'}`}></div>
                   <div>
                     <p className="text-[10px] font-black uppercase opacity-50">{editingMessage ? 'Editing' : `Replying to ${replyTo?.type === 'sent' ? 'You' : selectedConvo?.customerName}`}</p>
-                    <p className="text-xs truncate max-w-[300px] opacity-70 italic">{editingMessage?.text || replyTo?.text || 'Image'}</p>
+                    <p className="text-xs truncate max-w-[300px] opacity-70 ">{editingMessage?.text || replyTo?.text || 'Image'}</p>
                   </div>
                 </div>
                 <button onClick={cancelInteractions} className="relative z-10 p-2 hover:bg-white/10 rounded-full transition-all shrink-0"><XCircle size={18} /></button>
@@ -381,6 +383,14 @@ const ChatWindow = ({
                   <Plus size={20} />
                   <input type="file" multiple className="hidden" onChange={handleFileChange} />
                 </label>
+                <CannedResponsePanel
+                  drafts={drafts}
+                  isDarkMode={isDarkMode}
+                  brandId={brandId}
+                  onSelect={(draft) => {
+                    setMessageInput((prev) => (prev ? prev + ' ' + draft.result : draft.result));
+                  }}
+                />
                 <textarea
                   value={messageInput}
                   onChange={handleInputChange}
@@ -403,7 +413,7 @@ const ChatWindow = ({
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center opacity-30 text-center p-10">
           <MessageSquare size={48} className="mb-4" />
-          <p className="text-sm italic tracking-wide">{t('welcome')}</p>
+          <p className="text-sm  tracking-wide">{t('welcome')}</p>
         </div>
       )}
     </div>

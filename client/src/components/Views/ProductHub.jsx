@@ -226,7 +226,7 @@ const ProductHub = ({ isDarkMode, t, products }) => {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
-          <h3 className={`text-3xl md:text-4xl font-black tracking-tighter uppercase italic ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+          <h3 className={`text-3xl md:text-4xl font-black tracking-tighter uppercase  ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
             Product <span className="text-prime-500">{activeTab === 'offers' ? 'Offers' : 'Hub'}</span>
           </h3>
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mt-2">
@@ -409,7 +409,7 @@ const ProductHub = ({ isDarkMode, t, products }) => {
             <button onClick={() => setIsAddModalOpen(false)} className="absolute top-8 right-8 text-gray-500 hover:text-white transition-colors">
               <X size={24} />
             </button>
-            <h3 className="text-2xl font-black mb-8 italic uppercase tracking-tighter">Register New <span className="text-prime-500">Product</span></h3>
+            <h3 className="text-2xl font-black mb-8  uppercase tracking-tighter">Register New <span className="text-prime-500">Product</span></h3>
             
             <form onSubmit={handleAddProduct} className="space-y-6">
               <div className="grid grid-cols-2 gap-6">
@@ -564,7 +564,7 @@ const ProductHub = ({ isDarkMode, t, products }) => {
             <button onClick={() => setEditingProduct(null)} className="absolute top-8 right-8 text-gray-500 hover:text-white transition-colors">
               <X size={24} />
             </button>
-            <h3 className="text-2xl font-black mb-8 italic uppercase tracking-tighter">Edit <span className="text-prime-500">Product</span></h3>
+            <h3 className="text-2xl font-black mb-8  uppercase tracking-tighter">Edit <span className="text-prime-500">Product</span></h3>
             
             <form onSubmit={handleUpdateProduct} className="space-y-6">
               <div className="grid grid-cols-2 gap-6">

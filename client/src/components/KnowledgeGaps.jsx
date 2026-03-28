@@ -25,7 +25,7 @@ const KnowledgeGaps = ({
       <div className="flex justify-between items-center mb-6">
         <div>
           <h3 className={`text-xl font-black uppercase tracking-widest ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{t('knowledge_gaps')}</h3>
-          <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mt-1 italic">Train AI on Micro-Brand Details</p>
+          <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mt-1 ">Train AI on Micro-Brand Details</p>
         </div>
         <button 
           onClick={handleDreamGaps}
@@ -41,7 +41,7 @@ const KnowledgeGaps = ({
 
       <div className="space-y-6">
         {gaps.length === 0 ? (
-          <p className="text-gray-500 italic text-sm text-center py-10 border border-dashed border-white/10 rounded-2xl">Use "Ask Me Details" to let AI generate questions about your brand.</p>
+          <p className="text-gray-500  text-sm text-center py-10 border border-dashed border-white/10 rounded-2xl">Use "Ask Me Details" to let AI generate questions about your brand.</p>
         ) : (
           gaps.map((gap) => (
             <div key={gap.id} className="p-6 rounded-2xl border border-white/10 bg-white/5 transition-all hover:bg-white/10 group/gap-card">
@@ -55,7 +55,7 @@ const KnowledgeGaps = ({
                     <p className="text-[10px] font-black text-prime-400 uppercase tracking-widest mb-1 flex items-center gap-2">
                       <Sparkles size={10} /> Gemini Suggestion (Editable)
                     </p>
-                    <p className="text-xs italic text-gray-300">"{gap.suggestedAnswer}"</p>
+                    <p className="text-xs  text-gray-300">"{gap.suggestedAnswer}"</p>
                   </div>
                 )}
                 <textarea 

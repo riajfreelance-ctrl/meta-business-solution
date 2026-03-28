@@ -3,6 +3,13 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 require('dotenv').config();
 
+// Global sanitization: users often paste environment variables with trailing newlines
+Object.keys(process.env).forEach(key => {
+  if (typeof process.env[key] === 'string') {
+    process.env[key] = process.env[key].replace(/\\n/g, '').trim();
+  }
+});
+
 const { serverLog } = require('./utils/logger');
 
 // Routes

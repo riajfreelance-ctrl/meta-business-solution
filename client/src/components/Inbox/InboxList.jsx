@@ -43,7 +43,7 @@ const InboxList = ({
   return (
     <div className="flex-1 overflow-y-auto scrollbar-none">
       {filtered.length === 0 ? (
-        <div className="text-center py-20 opacity-20 italic text-sm">{t('coming_soon_desc')}</div>
+        <div className="text-center py-20 opacity-20  text-sm">{t('coming_soon_desc')}</div>
       ) : (
         filtered.map(convo => (
           <div key={convo.id} className="relative group">

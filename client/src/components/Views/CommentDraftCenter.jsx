@@ -217,7 +217,7 @@ const CommentDraftCenter = ({ isDarkMode, t, commentDrafts = [], pendingComments
     <div className="animate-fade-in space-y-10 pb-20">
       <div className="flex justify-between items-end mb-4 px-2">
         <div>
-          <h3 className="text-5xl font-black tracking-tighter mb-2 italic">Engagement Center</h3>
+          <h3 className="text-5xl font-black tracking-tighter mb-2 ">Engagement Center</h3>
           <p className={`text-[11px] uppercase font-black tracking-[0.4em] ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
             Powering {(commentDrafts || []).length} Autonomous Growth Strategies
           </p>

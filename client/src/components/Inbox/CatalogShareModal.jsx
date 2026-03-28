@@ -91,7 +91,7 @@ const CatalogShareModal = ({ isOpen, onClose, isDarkMode, t, products, onShare }
             </div>
           ))}
           {filteredProducts.length === 0 && (
-            <div className="text-center py-10 opacity-30 italic text-sm">No products found</div>
+            <div className="text-center py-10 opacity-30  text-sm">No products found</div>
           )}
         </div>
 

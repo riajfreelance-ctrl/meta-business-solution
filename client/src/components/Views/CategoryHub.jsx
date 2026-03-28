@@ -25,7 +25,7 @@ const CategoryHub = ({ isDarkMode, t, category, onSubSelect }) => {
                 Main Category
               </span>
             </div>
-            <h1 className={`text-5xl md:text-6xl font-black mb-6 tracking-tight italic ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+            <h1 className={`text-5xl md:text-6xl font-black mb-6 tracking-tight  ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
               {t(category.label).toUpperCase()}<span className="text-indigo-500">.</span>
             </h1>
             <p className={`text-xl leading-relaxed ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>

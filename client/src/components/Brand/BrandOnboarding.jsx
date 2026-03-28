@@ -89,7 +89,7 @@ const BrandOnboarding = ({ isOpen, onClose, isDarkMode }) => {
                 <Building2 size={32} />
               </div>
               <h2 className="text-4xl font-black uppercase tracking-tighter leading-none mb-4">Launch your <br/> next brand.</h2>
-              <p className="text-white/60 text-sm font-medium leading-relaxed uppercase tracking-widest italic">Anzaar Engine helps you scale with AI-driven commerce intelligence.</p>
+              <p className="text-white/60 text-sm font-medium leading-relaxed uppercase tracking-widest ">Anzaar Engine helps you scale with AI-driven commerce intelligence.</p>
             </div>
 
             <div className="relative z-10 space-y-6">

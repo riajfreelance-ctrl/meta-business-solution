@@ -89,7 +89,7 @@ const GlobalBanner = ({ isDarkMode }) => {
               </div>
               <h4 className="text-sm font-black text-white leading-tight">
                 {announcement.title}
-                <span className="ml-3 font-medium text-white/70 italic">{announcement.message}</span>
+                <span className="ml-3 font-medium text-white/70 ">{announcement.message}</span>
               </h4>
             </div>
           </div>

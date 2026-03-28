@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   DollarSign, TrendingUp, Users, Zap, ShoppingBag, ArrowUpRight, ArrowDownRight, 
-  Activity, CheckCircle2, Clock, Globe, ShieldCheck, Target, Award, MapPin
+  Activity, CheckCircle2, Clock, Globe, ShieldCheck, Target, Award, MapPin, Layers, Trophy
 } from 'lucide-react';
 import { useBrand } from '../../context/BrandContext';
 
@@ -49,7 +49,7 @@ const FunnelStep = ({ stepName, number, percentage, color }) => (
 );
 
 // ── MAIN CEO DASHBOARD VIEW ──
-const HomeView = ({ isDarkMode, t, language, theme }) => {
+const HomeView = ({ isDarkMode, t, language, theme, drafts = [] }) => {
   const { activeBrandId } = useBrand();
   
   // Real-time greeting
@@ -200,6 +200,47 @@ const HomeView = ({ isDarkMode, t, language, theme }) => {
           </div>
         </div>
       </div>
+
+      {/* ── 4. TOP PERFORMING RULES WIDGET (Non-AI, Live Data) ── */}
+      {drafts.filter(d => (d.status === 'approved' || !d.status) && d.successCount > 0).length > 0 && (
+        <div className="p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] border bg-[#0b1120] border-slate-800 shadow-xl shadow-black/20">
+          <div className="flex items-center justify-between mb-4 md:mb-6">
+            <div>
+              <h3 className="text-lg md:text-xl font-black uppercase tracking-tighter text-white flex items-center gap-2">
+                <Trophy size={20} className="text-amber-400" /> Top Performing Rules
+              </h3>
+              <p className="text-[10px] md:text-xs text-gray-400 font-bold uppercase tracking-widest">Non-AI • Most Successful Auto-Replies</p>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-black uppercase tracking-wider">
+              <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+              AI-Free
+            </div>
+          </div>
+          <div className="space-y-3">
+            {drafts
+              .filter(d => (d.status === 'approved' || !d.status) && d.successCount > 0)
+              .sort((a, b) => (b.successCount || 0) - (a.successCount || 0))
+              .slice(0, 5)
+              .map((draft, i) => (
+                <div key={draft.id || i} className="flex items-center gap-4 p-3 md:p-4 rounded-xl md:rounded-2xl bg-[#0f172a] border border-slate-800 group hover:border-prime-500/30 transition-all">
+                  <div className={`w-8 h-8 md:w-10 md:h-10 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${
+                    i === 0 ? 'bg-amber-500/20 text-amber-400' :
+                    i === 1 ? 'bg-slate-400/20 text-slate-300' :
+                    'bg-slate-700/30 text-slate-500'
+                  }`}>#{i + 1}</div>
+                  <div className="flex-1 overflow-hidden">
+                    <p className="text-xs md:text-sm font-black text-white truncate">{draft.keyword}</p>
+                    <p className="text-[10px] text-slate-500 font-medium truncate">{draft.result}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-lg md:text-xl font-black text-emerald-400">{draft.successCount}</p>
+                    <p className="text-[8px] md:text-[9px] font-black uppercase tracking-widest text-slate-600">Hits</p>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
 
     </div>
   );

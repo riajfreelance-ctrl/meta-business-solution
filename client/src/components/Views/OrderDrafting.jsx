@@ -186,7 +186,7 @@ const OrderDrafting = ({ isDarkMode, t, selectedConvo, products, onClose, active
             <ShoppingCart size={18} />
           </div>
           <div>
-            <h3 className="font-black uppercase tracking-tighter text-sm italic">Drafting Center</h3>
+            <h3 className="font-black uppercase tracking-tighter text-sm ">Drafting Center</h3>
             <p className="text-[9px] font-black uppercase opacity-40">Anzaar Engine 2.0 Logic</p>
           </div>
         </div>
@@ -418,7 +418,7 @@ const OrderDrafting = ({ isDarkMode, t, selectedConvo, products, onClose, active
              </div>
            )}
            <div className="pt-2 flex justify-between items-center border-t border-white/5">
-              <span className="text-sm font-black uppercase tracking-tighter italic">Final Receivable</span>
+              <span className="text-sm font-black uppercase tracking-tighter ">Final Receivable</span>
               <span className="text-3xl font-black tracking-tighter">৳{finalDue}</span>
            </div>
         </div>

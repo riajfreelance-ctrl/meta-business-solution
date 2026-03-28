@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, CheckCircle, Trash2, Zap, XCircle, Edit3, Layers, Cpu, PlusCircle, Settings, Globe, ShieldCheck } from 'lucide-react';
+import { MessageSquare, CheckCircle, Trash2, Zap, XCircle, Edit3, Layers, Cpu, PlusCircle, Settings, Globe, ShieldCheck, Clock, ArchiveRestore, BookOpen } from 'lucide-react';
 import { db } from '../../firebase-client';
 import { doc, updateDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import ActionMenu from '../Shared/ActionMenu';
@@ -8,9 +8,9 @@ import { useBrand } from '../../context/BrandContext';
 
 const DraftCenter = ({ 
   isDarkMode, t, drafts, language, handleApproveDraft, 
-  handleExpandKeywords, expandingId, toggleVariation 
+  handleExpandKeywords, handleLinguisticExpand, expandingId, toggleVariation 
 }) => {
-  const { activeBrandId, activeBrand, brandDocRef } = useBrand(); // Assuming useBrand provides brand doc update methods
+  const { activeBrandId, brandData, refreshBrandData } = useBrand(); 
   const [editingDraft, setEditingDraft] = useState(null);
   const [deletingDraftId, setDeletingDraftId] = useState(null);
   const [selectedDetailDraft, setSelectedDetailDraft] = useState(null);
@@ -19,6 +19,7 @@ const DraftCenter = ({
   const [editForm, setEditForm] = useState({ keyword: '', result: '' });
   const [selectedDrafts, setSelectedDrafts] = useState(new Set());
   const [activeTab, setActiveTab] = useState('approved'); // 'approved' or 'pending'
+  const [editingVar, setEditingVar] = useState({ draftId: null, index: null, value: '' });
 
   const toggleSelect = (id) => {
     const newSelected = new Set(selectedDrafts);
@@ -48,9 +49,21 @@ const DraftCenter = ({
   const handleBulkDelete = async () => {
      // Logic for bulk delete
      for (const id of selectedDrafts) {
-       await deleteDoc(doc(db, "draft_replies", id));
+       if (activeTab === 'history') {
+         await deleteDoc(doc(db, "draft_replies", id));
+       } else {
+         await updateDoc(doc(db, "draft_replies", id), { status: 'history' });
+       }
      }
      setSelectedDrafts(new Set());
+  };
+
+  const handleRestoreDraft = async (draftId) => {
+    try {
+      await updateDoc(doc(db, "draft_replies", draftId), { status: 'approved' });
+    } catch (error) {
+      console.error("Error restoring draft:", error);
+    }
   };
 
   const handleAddDraft = async () => {
@@ -93,12 +106,28 @@ const DraftCenter = ({
   const toggleLinguisticAutomation = async () => {
     if (!activeBrandId) return;
     try {
+      if (!activeBrandId || !db) return; // DB Sanity Check
       const brandRef = doc(db, "brands", activeBrandId);
       await updateDoc(brandRef, {
-        autoHyperIndex: activeBrand?.autoHyperIndex === false ? true : false
+        autoHyperIndex: brandData?.autoHyperIndex === false ? true : false
       });
+      if (refreshBrandData) refreshBrandData();
     } catch (error) {
       console.error("Error toggling automation:", error);
+    }
+  };
+
+  const toggleLearningMode = async () => {
+    if (!activeBrandId) return;
+    try {
+      if (!activeBrandId || !db) return; // DB Sanity Check
+      const brandRef = doc(db, "brands", activeBrandId);
+      await updateDoc(brandRef, {
+        isLearningMode: !brandData?.isLearningMode
+      });
+      if (refreshBrandData) refreshBrandData();
+    } catch (error) {
+      console.error("Error toggling learning mode:", error);
     }
   };
 
@@ -109,7 +138,6 @@ const DraftCenter = ({
       if (draft) {
         const newVariations = draft.variations.filter(v => v !== variationToRemove);
         await updateDoc(draftRef, { variations: newVariations });
-        // Update local state if needed, though Firestore listener usually handles it
         if (selectedDetailDraft && selectedDetailDraft.id === draftId) {
           setSelectedDetailDraft({ ...selectedDetailDraft, variations: newVariations });
         }
@@ -119,10 +147,36 @@ const DraftCenter = ({
     }
   };
 
+  const handleEditVar = (draftId, index, value) => {
+    setEditingVar({ draftId, index, value });
+  };
+
+  const handleSaveVar = async (draftId, index) => {
+    try {
+      const draftRef = doc(db, "draft_replies", draftId);
+      const draft = drafts.find(d => d.id === draftId);
+      if (draft) {
+        const newVariations = [...(draft.variations || [])];
+        newVariations[index] = editingVar.value;
+        await updateDoc(draftRef, { variations: newVariations });
+        setEditingVar({ draftId: null, index: null, value: '' });
+        if (selectedDetailDraft && selectedDetailDraft.id === draftId) {
+          setSelectedDetailDraft({ ...selectedDetailDraft, variations: newVariations });
+        }
+      }
+    } catch (error) {
+      console.error("Error saving variation:", error);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deletingDraftId) return;
     try {
-      await deleteDoc(doc(db, "draft_replies", deletingDraftId));
+      if (activeTab === 'history') {
+        await deleteDoc(doc(db, "draft_replies", deletingDraftId));
+      } else {
+        await updateDoc(doc(db, "draft_replies", deletingDraftId), { status: 'history' });
+      }
       setDeletingDraftId(null);
     } catch (error) {
       console.error("Error deleting draft:", error);
@@ -150,15 +204,45 @@ const DraftCenter = ({
           <button 
             onClick={toggleLinguisticAutomation}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all duration-300 ${
-              activeBrand?.autoHyperIndex !== false
+              brandData?.autoHyperIndex !== false
                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500 shadow-lg shadow-emerald-500/10'
                 : 'bg-gray-500/10 border-gray-500/30 text-gray-500'
             }`}
           >
-            <Cpu className={`w-4 h-4 ${activeBrand?.autoHyperIndex !== false ? 'animate-pulse' : ''}`} />
+            <Cpu className={`w-4 h-4 ${brandData?.autoHyperIndex !== false ? 'animate-pulse' : ''}`} />
             <span className="text-sm font-medium">
-              {activeBrand?.autoHyperIndex !== false ? 'Auto-Expansion: ON' : 'Auto-Expansion: OFF'}
+              {brandData?.autoHyperIndex !== false ? 'Auto-Expansion: ON' : 'Auto-Expansion: OFF'}
             </span>
+          </button>
+
+          {/* Learning Mode Toggle */}
+          <button 
+            onClick={toggleLearningMode}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all duration-300 ${
+              brandData?.isLearningMode
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-500 shadow-lg shadow-amber-500/10'
+                : 'bg-gray-500/10 border-gray-500/30 text-gray-500'
+            }`}
+          >
+            <BookOpen className={`w-4 h-4 ${brandData?.isLearningMode ? 'animate-pulse' : ''}`} />
+            <span className="text-sm font-medium">
+              {brandData?.isLearningMode ? 'Learning Mode: ON' : 'Learning Mode: OFF'}
+            </span>
+          </button>
+
+          <button 
+            onClick={async () => {
+              if (!activeBrandId) return;
+              try {
+                const res = await fetch(`/api/brands/${activeBrandId}/index-products`, { method: 'POST' });
+                const data = await res.json();
+                alert(`Successfully indexed ${data.indexed} product images!`);
+              } catch (e) { alert("Error indexing products"); }
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-500 border border-emerald-500/20 rounded-xl transition-all text-sm font-medium"
+          >
+            <Globe className="w-4 h-4" />
+            Sync Product Images
           </button>
 
           <button 
@@ -210,6 +294,15 @@ const DraftCenter = ({
              {drafts.filter(d => d.status === 'pending').length > 0 && (
                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
              )}
+           </button>
+           <button 
+             onClick={() => setActiveTab('history')}
+             className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${
+               activeTab === 'history' ? 'bg-slate-500 text-white shadow-lg shadow-slate-500/20' : 'text-gray-500 hover:text-gray-300'
+             }`}
+           >
+             <Clock size={12} />
+             History
            </button>
         </div>
 
@@ -270,7 +363,7 @@ const DraftCenter = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {drafts.filter(d => (activeTab === 'pending' ? d.status === 'pending' : d.status !== 'pending')).length === 0 ? (
+            {drafts.filter(d => d.status === activeTab).length === 0 ? (
               <tr>
                 <td colSpan="6" className="p-12 text-center text-gray-500">
                   <MessageSquare size={32} className="mx-auto mb-3 opacity-20" />
@@ -278,7 +371,7 @@ const DraftCenter = ({
                 </td>
               </tr>
             ) : (
-              drafts.filter(d => (activeTab === 'pending' ? d.status === 'pending' : d.status !== 'pending')).map((draft) => (
+              drafts.filter(d => d.status === activeTab).map((draft) => (
                 <tr 
                   key={draft.id} 
                   onClick={() => setSelectedDetailDraft(draft)}
@@ -306,21 +399,26 @@ const DraftCenter = ({
                          <span className={`text-sm font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{draft.keyword}</span>
                       </div>
                       <div className="flex gap-1 flex-wrap">
+                        {draft.type === 'knowledge_base' && (
+                          <span className="bg-purple-500/10 text-purple-400 px-1.5 py-0.5 rounded border border-purple-500/20 text-[7px] font-black uppercase tracking-widest flex items-center gap-1">
+                            <BookOpen size={8} /> Knowledge
+                          </span>
+                        )}
                         {draft.type === 'auto_learned' && (
                           <span className="bg-prime-500/10 text-prime-400 px-1.5 py-0.5 rounded border border-prime-500/20 text-[7px] font-black uppercase tracking-widest">
                             Auto-Learned
                           </span>
                         )}
-                        {(draft.successCount || 0) >= 5 && (
-                          <span className="bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded border border-amber-500/20 text-[7px] font-black uppercase tracking-widest flex items-center gap-1">
-                            👑 Top Performer
+                        {draft.imageHashes && draft.imageHashes.length > 0 && (
+                          <span className="bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20 text-[7px] font-black uppercase tracking-widest flex items-center gap-1">
+                            🖼️ {draft.imageHashes.length} Images
                           </span>
                         )}
                       </div>
                     </div>
                   </td>
                   <td className="p-5 max-w-xs lg:max-w-md">
-                    <p className={`text-xs font-medium line-clamp-1 italic ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>"{draft.result}"</p>
+                    <p className={`text-xs font-medium line-clamp-1  ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>"{draft.result}"</p>
                   </td>
                   <td className="p-5">
                     <div className="flex flex-col">
@@ -346,23 +444,35 @@ const DraftCenter = ({
                   </td>
                   <td className="p-5">
                     <div className="flex justify-end items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                      <button 
-                        onClick={() => handleApproveDraft(draft)}
-                        title="Approve"
-                        className={`p-2 rounded-xl transition-all ${isDarkMode ? 'bg-prime-500/10 text-prime-400 hover:bg-prime-500/20 shadow-lg shadow-prime-500/10' : 'bg-prime-50 text-prime-600 hover:bg-prime-500/10'}`}
-                      >
-                         <CheckCircle size={16} />
-                      </button>
-                      <button 
-                        onClick={() => handleEdit(draft)}
-                        title="Edit"
-                        className={`p-2 rounded-xl transition-all ${isDarkMode ? 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10' : 'bg-gray-100 text-gray-500 hover:text-gray-900 hover:bg-gray-200'}`}
-                      >
-                         <Edit3 size={16} />
-                      </button>
+                      {activeTab === 'history' ? (
+                        <button 
+                          onClick={() => handleRestoreDraft(draft.id)}
+                          title="Restore"
+                          className={`p-2 rounded-xl transition-all ${isDarkMode ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 shadow-lg shadow-emerald-500/10' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-500/10'}`}
+                        >
+                           <ArchiveRestore size={16} />
+                        </button>
+                      ) : (
+                        <>
+                          <button 
+                            onClick={() => handleApproveDraft(draft)}
+                            title="Approve"
+                            className={`p-2 rounded-xl transition-all ${isDarkMode ? 'bg-prime-500/10 text-prime-400 hover:bg-prime-500/20 shadow-lg shadow-prime-500/10' : 'bg-prime-50 text-prime-600 hover:bg-prime-500/10'}`}
+                          >
+                             <CheckCircle size={16} />
+                          </button>
+                          <button 
+                            onClick={() => handleEdit(draft)}
+                            title="Edit"
+                            className={`p-2 rounded-xl transition-all ${isDarkMode ? 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10' : 'bg-gray-100 text-gray-500 hover:text-gray-900 hover:bg-gray-200'}`}
+                          >
+                             <Edit3 size={16} />
+                          </button>
+                        </>
+                      )}
                       <button 
                         onClick={() => setDeletingDraftId(draft.id)}
-                        title="Delete"
+                        title={activeTab === 'history' ? "Delete Permanently" : "Move to History"}
                         className={`p-2 rounded-xl transition-all ${isDarkMode ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'bg-red-50 text-red-500 hover:bg-red-100'}`}
                       >
                          <Trash2 size={16} />
@@ -411,15 +521,29 @@ const DraftCenter = ({
                       >
                         Approve & Sync
                       </button>
-                      <button 
-                        onClick={() => {
-                          handleEdit(selectedDetailDraft);
-                          setSelectedDetailDraft(null);
-                        }}
-                        className={`px-6 py-3 rounded-xl text-[10px] font-black border transition-all ${isDarkMode ? 'bg-white/5 border-white/5 text-gray-400 hover:text-white' : 'bg-gray-100 border-gray-200 text-gray-600'}`}
-                      >
-                        {t('edit')}
-                      </button>
+                      {selectedDetailDraft.status === 'history' ? (
+                        <button 
+                          onClick={() => {
+                              handleRestoreDraft(selectedDetailDraft.id);
+                              setSelectedDetailDraft(null);
+                          }}
+                          className="px-6 py-3 bg-emerald-500/10 text-emerald-500 border border-emerald-500/10 rounded-xl text-[10px] font-black active:scale-95 transition-all"
+                        >
+                          Restore Rule
+                        </button>
+                      ) : (
+                        <>
+                          <button 
+                            onClick={() => {
+                              handleEdit(selectedDetailDraft);
+                              setSelectedDetailDraft(null);
+                            }}
+                            className={`px-6 py-3 rounded-xl text-[10px] font-black border transition-all ${isDarkMode ? 'bg-white/5 border-white/5 text-gray-400 hover:text-white' : 'bg-gray-100 border-gray-200 text-gray-600'}`}
+                          >
+                            {t('edit')}
+                          </button>
+                        </>
+                      )}
                       <button 
                         onClick={() => {
                             setDeletingDraftId(selectedDetailDraft.id);
@@ -427,7 +551,7 @@ const DraftCenter = ({
                         }}
                         className="px-6 py-3 bg-red-500/10 text-red-500 border border-red-500/10 rounded-xl text-[10px] font-black active:scale-95 transition-all"
                       >
-                        {t('delete')}
+                        {selectedDetailDraft.status === 'history' ? 'Delete Permanently' : t('delete')}
                       </button>
                       <div className="h-8 w-px bg-white/10 mx-2" />
                       <button 
@@ -447,7 +571,7 @@ const DraftCenter = ({
                            <Layers size={14} className="text-prime-400" />
                            <label className="text-[10px] font-black uppercase text-prime-400">Statement Logic</label>
                          </div>
-                         <div className={`p-8 rounded-[2rem] border font-black text-3xl tracking-tighter leading-snug italic normal-case ${isDarkMode ? 'bg-black/40 border-white/5' : 'bg-gray-50 border-black/5'}`}>
+                         <div className={`p-8 rounded-[2rem] border font-black text-3xl tracking-tighter leading-snug  normal-case ${isDarkMode ? 'bg-black/40 border-white/5' : 'bg-gray-50 border-black/5'}`}>
                            "{selectedDetailDraft.keyword}"
                          </div>
                       </div>
@@ -468,34 +592,76 @@ const DraftCenter = ({
                            <Zap size={18} className="text-prime-400" />
                            <label className="text-[10px] font-black uppercase text-prime-400">Generative Semantic Expansion</label>
                         </div>
-                        <button 
-                          onClick={() => handleExpandKeywords(selectedDetailDraft.id, selectedDetailDraft.keyword)}
-                          className={`relative flex items-center gap-3 px-8 py-3 rounded-xl text-[10px] font-black uppercase transition-all overflow-hidden ${
-                            expandingId === selectedDetailDraft.id ? 'bg-prime-500/20 text-prime-400 animate-pulse' : 'bg-white/5 text-gray-400 hover:text-white border border-white/5'
-                          }`}
-                        >
-                          {expandingId === selectedDetailDraft.id && <div className="absolute inset-0 animate-shimmer" />}
-                          <span className="relative z-10">{expandingId === selectedDetailDraft.id ? 'Gemini Generating...' : 'Regenerate Semantic Logic'}</span>
-                        </button>
+                        <div className="flex items-center gap-3">
+                            <button 
+                              onClick={() => handleLinguisticExpand(selectedDetailDraft.id, selectedDetailDraft.keyword)}
+                              className={`flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all border ${
+                                expandingId === selectedDetailDraft.id ? 'bg-indigo-500/20 text-indigo-400 animate-pulse' : 'bg-white/5 text-gray-400 hover:text-white border-white/5'
+                              }`}
+                            >
+                              <Globe size={14} />
+                              <span>{expandingId === selectedDetailDraft.id ? 'Processing...' : 'Linguistic Expansion'}</span>
+                            </button>
+                            <button 
+                              onClick={() => handleExpandKeywords(selectedDetailDraft.id, selectedDetailDraft.keyword)}
+                              className={`relative flex items-center gap-3 px-8 py-3 rounded-xl text-[10px] font-black uppercase transition-all overflow-hidden ${
+                                expandingId === selectedDetailDraft.id ? 'bg-prime-500/20 text-prime-400 animate-pulse' : 'bg-white/5 text-gray-400 hover:text-white border border-white/5'
+                              }`}
+                            >
+                              {expandingId === selectedDetailDraft.id && <div className="absolute inset-0 animate-shimmer" />}
+                              <span className="relative z-10">{expandingId === selectedDetailDraft.id ? 'Gemini Generating...' : 'AI Semantic Expansion'}</span>
+                            </button>
+                         </div>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                         {selectedDetailDraft.variations?.map((v, idx) => (
-                           <div 
-                             key={idx} 
-                             className={`group/v relative p-4 rounded-xl border transition-all text-xs font-bold leading-relaxed ${isDarkMode ? 'bg-white/5 border-white/5 text-gray-300 hover:border-prime-500/30' : 'bg-gray-50 border-gray-100 text-gray-700 hover:border-prime-500/30'}`}
-                           >
-                             {v}
-                             <button 
-                               onClick={(e) => {
-                                 e.stopPropagation();
-                                 removeVariation(selectedDetailDraft.id, v);
-                               }}
-                               className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover/v:opacity-100 transition-all hover:scale-110 shadow-lg"
+                         {selectedDetailDraft.variations?.map((v, idx) => {
+                           const isEditing = editingVar.draftId === selectedDetailDraft.id && editingVar.index === idx;
+                           return (
+                             <div 
+                               key={idx} 
+                               className={`group/v relative p-4 rounded-xl border transition-all text-xs font-bold leading-relaxed ${isDarkMode ? 'bg-white/5 border-white/5 text-gray-300 hover:border-prime-500/30' : 'bg-gray-50 border-gray-100 text-gray-700 hover:border-prime-500/30'}`}
                              >
-                               <XCircle size={12} />
-                             </button>
-                           </div>
-                         ))}
+                               {isEditing ? (
+                                 <div className="flex items-center gap-2">
+                                   <input 
+                                     type="text"
+                                     value={editingVar.value}
+                                     onChange={(e) => setEditingVar({ ...editingVar, value: e.target.value })}
+                                     className={`flex-1 bg-transparent border-none outline-none text-white font-bold p-0`}
+                                     autoFocus
+                                     onKeyDown={(e) => e.key === 'Enter' && handleSaveVar(selectedDetailDraft.id, idx)}
+                                   />
+                                   <button 
+                                     onClick={() => handleSaveVar(selectedDetailDraft.id, idx)}
+                                     className="text-emerald-500 hover:text-emerald-400 transition-colors"
+                                   >
+                                     <CheckCircle size={14} />
+                                   </button>
+                                 </div>
+                               ) : (
+                                 <div className="flex justify-between items-center gap-2">
+                                   <span className="truncate">{v}</span>
+                                   <button 
+                                     onClick={() => handleEditVar(selectedDetailDraft.id, idx, v)}
+                                     className="opacity-0 group-hover/v:opacity-60 hover:opacity-100 transition-all text-gray-400"
+                                   >
+                                     <Edit3 size={12} />
+                                   </button>
+                                 </div>
+                               )}
+                               
+                               <button 
+                                 onClick={(e) => {
+                                   e.stopPropagation();
+                                   removeVariation(selectedDetailDraft.id, v);
+                                 }}
+                                 className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover/v:opacity-100 transition-all hover:scale-110 shadow-lg"
+                               >
+                                 <XCircle size={12} />
+                               </button>
+                             </div>
+                           );
+                         })}
                       </div>
                    </div>
                    
@@ -579,8 +745,8 @@ const DraftCenter = ({
         isOpen={!!deletingDraftId}
         onClose={() => setDeletingDraftId(null)}
         onConfirm={handleDelete}
-        title={t('confirm_delete')}
-        message="Are you sure you want to delete this draft? It will be permanently removed."
+        title={activeTab === 'history' ? "Delete Permanently" : t('confirm_delete')}
+        message={activeTab === 'history' ? "Are you sure you want to permanently delete this draft from history? This cannot be undone." : "Are you sure you want to move this draft to history? It will no longer be active."}
         isDarkMode={isDarkMode}
         t={t}
       />
@@ -597,7 +763,7 @@ const DraftCenter = ({
                       <PlusCircle className="text-prime-400" size={28} />
                    </div>
                    <div>
-                     <h3 className="text-3xl font-black tracking-tighter italic">Manual Entry</h3>
+                     <h3 className="text-3xl font-black tracking-tighter ">Manual Entry</h3>
                      <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em]">Add Custom Intent Strategy</p>
                    </div>
                 </div>

@@ -23,7 +23,7 @@ const BillingHistory = ({ isDarkMode, t }) => {
         }`}>
           <div className="flex items-center gap-6">
             <div className="w-16 h-12 bg-slate-800 rounded-xl flex items-center justify-center border border-white/10 shrink-0">
-              <span className="text-white font-black text-xs italic">VISA</span>
+              <span className="text-white font-black text-xs ">VISA</span>
             </div>
             <div>
               <h4 className="font-bold text-sm md:text-base">Visa Ending in 4242</h4>

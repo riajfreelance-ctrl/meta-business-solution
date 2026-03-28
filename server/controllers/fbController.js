@@ -1,7 +1,7 @@
 const { db, getBrandByPlatformId, serverTimestamp } = require('../services/firestoreService');
 const { getProfile, sendMessage, replyToComment, sendPrivateReply, getPostContent, likeComment, hideComment, sendCarouselMessage, sendSequencedMedia } = require('../services/facebookService');
 const { getDynamicModel, getDynamicVisionModel } = require('../services/geminiService');
-const { getLinguisticVariations, normalizePhonetic } = require('../utils/linguisticEngine');
+const { getLinguisticVariations, normalizePhonetic, cleanNoise } = require('../utils/linguisticEngine');
 const { searchVectors } = require('../services/vectorSearchService');
 const { autoTagCustomer } = require('../services/autoTagService');
 const { assignPersona, logPersonaConversion } = require('../services/splitTestService');
@@ -11,6 +11,7 @@ const { serverLog } = require('../utils/logger');
 const { extractPhoneNumber, extractAddressSignals, detectBasicIntent } = require('../utils/extractors');
 const Fuse = require('fuse.js');
 const axios = require('axios');
+const { indexBrandProducts, findProductByPHash } = require('../services/productFingerprintService');
 const crypto = require('crypto');
 
 // --- PHASE 2: MULTI-MESSAGE ACCUMULATOR ---
@@ -27,7 +28,7 @@ async function verifyWebhook(req, res) {
     
     serverLog(`[WEBHOOK VERIFY] Mode: ${mode}, Token: ${token}`);
     
-    const globalToken = process.env.VERIFY_TOKEN || 'myapp4204';
+    const globalToken = (process.env.VERIFY_TOKEN || 'myapp4204').trim();
 
     if (mode && token) {
         if (mode === 'subscribe' && (token === globalToken)) {
@@ -65,8 +66,8 @@ async function handleWebhookPost(req, res) {
     const isIG = body.object === 'instagram';
 
     if (isFB || isIG) {
-        // Acknowledge immediately to prevent Facebook from retrying and spamming our API calls!
-        res.status(200).send('EVENT_RECEIVED');
+        // We will accumulate tasks to await at the end to prevent serverless termination
+        const tasks = [];
 
         for (const entry of body.entry) {
             const platformId = entry.id;
@@ -86,16 +87,15 @@ async function handleWebhookPost(req, res) {
 
                 if (webhook_event.message) {
                     if (webhook_event.message.is_echo) {
-                        handleEchoMessage(webhook_event, brandData);
+                        tasks.push(handleEchoMessage(webhook_event, brandData));
                     } else {
-                        // Fire and forget, don't await to block the loop
-                        processIncomingMessage(sender_psid, webhook_event.message, brandData, platformType).catch(console.error);
+                        tasks.push(processIncomingMessage(sender_psid, webhook_event.message, brandData, platformType));
                     }
                 }
 
                 // --- PHASE 3: HANDLE POSTBACKS (ORDER BUTTONS) ---
                 if (webhook_event.postback) {
-                    handlePostback(sender_psid, webhook_event.postback, brandData, platformType).catch(console.error);
+                    tasks.push(handlePostback(sender_psid, webhook_event.postback, brandData, platformType));
                 }
             }
 
@@ -103,12 +103,18 @@ async function handleWebhookPost(req, res) {
             if (entry.changes) {
                 for (const change of entry.changes) {
                     if (change.field === 'feed' && change.value.item === 'comment' && change.value.verb === 'add') {
-                        // Fire and forget
-                        processIncomingComment(change.value, brandData).catch(console.error);
+                        tasks.push(processIncomingComment(change.value, brandData));
                     }
                 }
             }
         }
+
+        try {
+            await Promise.allSettled(tasks);
+        } catch (e) {
+            serverLog(`[WEBHOOK TASKS ERROR] ${e.message}`);
+        }
+        res.status(200).send('EVENT_RECEIVED');
     } else {
         res.sendStatus(404);
     }
@@ -330,6 +336,7 @@ async function getApprovedInboxDraft(message, brandId, convoData) {
     if (searchableRecords.length === 0) return null;
 
     const normalizedInput = normalizePhonetic(lowerText);
+    const cleanedInput = cleanNoise(lowerText);
 
     // Configure Fuse for fuzzy matching
     const fuse = new Fuse(searchableRecords, {
@@ -339,12 +346,19 @@ async function getApprovedInboxDraft(message, brandId, convoData) {
         ignoreLocation: true
     });
 
-    // Try direct match, then phonetic fallback
+    // Try direct match, then phonetic fallback, then noise-cleaned fallback
     let results = fuse.search(lowerText);
     if (results.length === 0 || results[0].score > 0.2) {
         const phoneticResults = fuse.search(normalizedInput);
         if (phoneticResults.length > 0 && (!results[0] || phoneticResults[0].score < results[0].score)) {
             results = phoneticResults;
+        }
+    }
+    // 3rd pass: try with noise words stripped (e.g. 'bhai price koto?' -> 'price koto?')
+    if ((results.length === 0 || results[0].score > 0.2) && cleanedInput !== lowerText) {
+        const cleanedResults = fuse.search(cleanedInput);
+        if (cleanedResults.length > 0 && (!results[0] || cleanedResults[0].score < results[0].score)) {
+            results = cleanedResults;
         }
     }
     
@@ -463,35 +477,12 @@ async function processIncomingMessage(sender_psid, message, brandData, platformT
         return;
     }
 
-    // --- PHASE 2: CONTEXT ACCUMULATOR ---
-    // Process attachments immediately to avoid dropping media context
-    if (message.attachments && message.attachments.length > 0) {
-        return processThreadedMessage(sender_psid, message, brandData, platformType);
-    }
+    if (!message.text && (!message.attachments || message.attachments.length === 0)) return;
 
-    if (!message.text) return; // Ignore empty non-media
-
-    // Debounce text strings
-    if (!messageAccumulator.has(sender_psid)) {
-        messageAccumulator.set(sender_psid, {
-            timer: null,
-            texts: []
-        });
-    }
-
-    const mQueue = messageAccumulator.get(sender_psid);
-    mQueue.texts.push(message.text);
-
-    if (mQueue.timer) clearTimeout(mQueue.timer);
-
-    mQueue.timer = setTimeout(() => {
-        const fullMessageText = mQueue.texts.join(' \n');
-        messageAccumulator.delete(sender_psid);
-        
-        // Construct a logical "Threaded Message" and pass downstream
-        const threadedMessage = { ...message, text: fullMessageText };
-        processThreadedMessage(sender_psid, threadedMessage, brandData, platformType).catch(console.error);
-    }, 3000); // 3-second quiet window
+    // Direct synchronous jump, avoiding `setTimeout` which is killed by Vercel serverless containers
+    await processThreadedMessage(sender_psid, message, brandData, platformType).catch(e => {
+        serverLog(`[ProcessError] ${e.message}`);
+    });
 }
 
 async function processThreadedMessage(sender_psid, message, brandData, platformType = 'facebook') {
@@ -507,6 +498,17 @@ async function processThreadedMessage(sender_psid, message, brandData, platformT
         if (flowHandled) {
             serverLog(`[Inbox] Flow handled for ${sender_psid}`);
             return;
+        }
+
+        // --- PHASE 4: Learning Mode (Passive Training) ---
+        if (brandData.isLearningMode) {
+            serverLog(`[LEARNING MODE] Active for ${brandData.name}. Skipping automated responses to capture training data.`);
+            await db.collection('conversations').doc(sender_psid).update({
+                status: 'pending',
+                isPriority: true,
+                lastUpdate: Date.now()
+            });
+            return; // Exit here - let the human agent reply so we can learn
         }
 
     // 1. Handle Image Attachments (Visual Shopping)
@@ -685,48 +687,60 @@ async function handleAIResponse(sender_psid, text, brandData) {
 
 async function handleVisionResponse(psid, imageUrl, text, brandData) {
     try {
-        // --- PHASE 2: AI-FREE pHash Caching System ---
-        const incomingHash = await generatePHash(imageUrl);
-        if (incomingHash) {
-            serverLog(`[pHash] Generated Hash for incoming image: ${incomingHash}`);
-            
-            // Search KnowledgeCache for visually similar images
-            const cacheSnap = await db.collection('vision_knowledge')
-                .where('brandId', '==', brandData.id)
-                .get();
+        // --- PHASE 1: Zero-Token Product Visual Matcher ---
+        const productMatch = await findProductByPHash(brandData.id, incomingHash);
+        if (productMatch) {
+            serverLog(`[Product Match HIT] Matched with Product: ${productMatch.productName}`);
+            const reply = `আপনার পাঠানো ছবিটি আমাদের "${productMatch.productName}" এর। এর বর্তমান দাম ${productMatch.offerPrice || productMatch.price} টাকা। আপনি কি এটি অর্ডার করতে চান? ✨`;
+            await sendAndLog(psid, reply, 'bot', brandData);
+            return; // ZERO TOKENS!
+        }
 
-            let bestMatch = null;
-            let lowestDistance = 999;
+        // --- PHASE 2: AI-FREE pHash Knowledge Caching ---
+        // (Existing vision_knowledge check)
+        const cacheSnap = await db.collection('vision_knowledge')
+            .where('brandId', '==', brandData.id)
+            .get();
 
-            for (const doc of cacheSnap.docs) {
-                const data = doc.data();
-                if (data.pHash) {
-                    const dist = getHammingDistance(incomingHash, data.pHash);
-                    // Threshold: 10 out of 256 bits for resized screenshots
-                    if (dist < 12 && dist < lowestDistance) {
-                        lowestDistance = dist;
-                        bestMatch = data;
-                    }
+        let bestCacheMatch = null;
+        let lowestDistance = 999;
+
+        for (const doc of cacheSnap.docs) {
+            const data = doc.data();
+            if (data.pHash) {
+                const dist = getHammingDistance(incomingHash, data.pHash);
+                if (dist < 12 && dist < lowestDistance) {
+                    lowestDistance = dist;
+                    bestCacheMatch = data;
                 }
             }
-
-            if (bestMatch) {
-                serverLog(`[pHash HIT] Matched with distance ${lowestDistance}. Serving from cache!`);
-                await sendAndLog(psid, bestMatch.response, 'bot', brandData);
-                return; // SKIP GEMINI COMPLETELY = FREE!
-            }
         }
-        // [PHASE 4: OCR FALLBACK]
-        // If pHash missed, try to read text from screenshot before calling Gemini Vision
+
+        if (bestCacheMatch) {
+            serverLog(`[Knowledge HIT] Matched with distance ${lowestDistance}. serving from cache!`);
+            await sendAndLog(psid, bestCacheMatch.response, 'bot', brandData);
+            return; // FREE!
+        }
+
+        // --- PHASE 3: Context-Aware OCR Fallback ---
         try {
             const Tesseract = require('tesseract.js');
             const { data: { text: ocrText } } = await Tesseract.recognize(imageUrl, 'ben+eng');
-            if (ocrText && ocrText.length > 10) {
-                serverLog(`[OCR] Detected text in image: ${ocrText.trim()}`);
-                // Use the detected text to try a deterministic match first
-                const matchedReply = await getApprovedInboxDraft(ocrText, brandData.id, {});
+            
+            // Fetch preceding message context to help OCR
+            const historySnap = await db.collection(`conversations/${psid}/messages`)
+                .orderBy('timestamp', 'desc')
+                .limit(2)
+                .get();
+            const precedingText = historySnap.docs.find(d => d.data().type === 'received' && d.data().text !== text)?.data()?.text || "";
+            
+            const combinedContext = (precedingText + " " + (ocrText || "") + " " + (text || "")).trim();
+
+            if (combinedContext.length > 5) {
+                serverLog(`[OCR Context] Combined Context: ${combinedContext}`);
+                const matchedReply = await getApprovedInboxDraft(combinedContext, brandData.id, {});
                 if (matchedReply) {
-                    serverLog(`[OCR HIT] Deterministic match via text recognition!`);
+                    serverLog(`[OCR HIT] Deterministic match via context recognition!`);
                     await sendAndLog(psid, matchedReply.text, 'bot', brandData);
                     return; // FREE!
                 }
@@ -1140,28 +1154,55 @@ async function handleEchoMessage(webhook_event, brandData) {
     const message = webhook_event.message;
     serverLog(`[Echo - ${brandData.name}] Admin Reply for ${psid}: ${text}`);
 
-    // EXPERT CAPTURE: If an agent sends a manual message, save it as a potential draft
-    // Rule: If it's NOT from our bot (no app_id or specific bot flag) and passes the filter
+    // --- PHASE 3: Bulk Passive Learning (External Source: Messenger/Business Suite) ---
     if (shouldCaptureAsDraft(text) && !message.app_id) {
-        // Try to find what the user asked (last message)
-        const history = await db.collection(`conversations/${psid}/messages`)
-            .orderBy('timestamp', 'desc')
-            .limit(2)
-            .get();
-        
-        const lastUserMsg = history.docs.find(d => d.data().type === 'received')?.data().text;
+        try {
+            const msgSnap = await db.collection(`conversations/${psid}/messages`)
+                .orderBy('timestamp', 'desc')
+                .limit(15)
+                .get();
+            
+            const messages = msgSnap.docs.map(d => d.data());
+            // In an echo, the current message (text) is already 'sent'.
+            // So we skip the first 'sent' message to find the preceding unreplied 'received' block.
+            const sentMessages = messages.filter(m => m.type === 'sent');
+            const unrepliedReceived = (sentMessages.length <= 1)
+                ? messages.filter(m => m.type === 'received')
+                : messages.slice(messages.indexOf(sentMessages[1])).filter(m => m.type === 'received');
 
-        if (lastUserMsg && shouldCaptureAsDraft(lastUserMsg)) {
-            await db.collection("draft_replies").add({
-                keyword: lastUserMsg,
-                result: text,
-                status: 'pending',
-                type: 'expert_learned',
-                brandId: brandData.id,
-                timestamp: admin.firestore.FieldValue.serverTimestamp(),
-                successCount: 0
-            });
-            serverLog(`[Expert-Learn] Agent teaching bot for: "${lastUserMsg}"`);
+            if (unrepliedReceived.length > 0) {
+                const aggregatedText = unrepliedReceived
+                    .filter(m => m.text)
+                    .reverse()
+                    .map(m => m.text)
+                    .join(" ");
+
+                const imageHashes = unrepliedReceived
+                    .filter(m => m.attachments && m.attachments[0]?.type === 'image')
+                    .map(m => m.attachments[0].pHash)
+                    .filter(h => h);
+
+                if (aggregatedText.length > 2 || imageHashes.length > 0) {
+                    const keyword = aggregatedText || "External Image Inquiry";
+                    const variations = (brandData.autoHyperIndex !== false) ? getLinguisticVariations(keyword) : [];
+                    
+                    await db.collection("draft_replies").add({
+                        keyword: keyword,
+                        result: text,
+                        variations: variations,
+                        imageHashes: imageHashes,
+                        status: 'pending',
+                        type: 'expert_learned',
+                        brandId: brandData.id,
+                        timestamp: serverTimestamp(),
+                        successCount: 0,
+                        metadata: { psid: psid, source: 'external_echo_passive_learn' }
+                    });
+                    serverLog(`[Passive-Learn] Learned from Messenger/Meta Suite reply for brand: ${brandData.id}`);
+                }
+            }
+        } catch (e) {
+            serverLog(`[Passive-Learn Error]: ${e.message}`);
         }
     }
 }
@@ -1306,75 +1347,55 @@ async function sendMessageFromDashboard(req, res) {
             await logPersonaConversion(targetId);
         }
 
-        // --- AUTO-LEARNING LOGIC ---
-        try {
-            // 1. Fetch recent messages and filter for 'received' in memory
-            const messagesRef = db.collection(`conversations/${targetId}/messages`);
-            const msgSnap = await messagesRef.orderBy('timestamp', 'desc').limit(10).get();
-            const lastReceivedMsg = msgSnap.docs
-                .map(d => d.data())
-                .find(m => m.type === 'received');
-
-            if (lastReceivedMsg) {
-                const questionText = lastReceivedMsg.text || (lastReceivedMsg.attachments?.[0]?.type === 'image' ? '[Image Attachment]' : 'Untitled Question');
-                const lowerQuestion = questionText.toLowerCase();
-                serverLog(`[Auto-Learning] Found last received message: ${questionText}`);
-
-                // 2. Duplicate Check: Is this already in the Knowledge Base?
-                const kbSnap = await db.collection('knowledge_base')
-                    .where('brandId', '==', brandData.id)
-                    .where('keywords', 'array-contains', lowerQuestion)
+        // --- PHASE 3: Bulk Auto-Learning (Staff Training) ---
+        if (text && text.length > 2) {
+            try {
+                // Find all 'received' messages since the last 'sent' message
+                const msgSnap = await db.collection(`conversations/${targetId}/messages`)
+                    .orderBy('timestamp', 'desc')
+                    .limit(15)
                     .get();
-                serverLog(`[Auto-Learning] KB Duplicate Check: ${!kbSnap.empty}`);
+                
+                const messages = msgSnap.docs.map(d => d.data());
+                const firstSentIdx = messages.findIndex(m => m.type === 'sent');
+                const unrepliedReceived = (firstSentIdx === -1) 
+                    ? messages.filter(m => m.type === 'received')
+                    : messages.slice(0, (firstSentIdx === -1 ? messages.length : firstSentIdx)).filter(m => m.type === 'received');
 
-                if (kbSnap.empty) {
-                    // 3. Grouping Check: Does another draft already use this exact same answer?
-                    const draftSnap = await db.collection('draft_replies')
-                        .where('brandId', '==', brandId)
-                        .where('result', '==', text)
-                        .get();
-                    serverLog(`[Auto-Learning] Grouping Check (Answer match): ${!draftSnap.empty}`);
+                if (unrepliedReceived.length > 0) {
+                    const aggregatedText = unrepliedReceived
+                        .filter(m => m.text)
+                        .reverse()
+                        .map(m => m.text)
+                        .join(" ");
 
-                    if (!draftSnap.empty) {
-                        // Update existing draft with this new question variation
-                        const draftDoc = draftSnap.docs[0];
-                        const existingVariations = draftDoc.data().variations || [];
-                        if (!existingVariations.includes(questionText) && draftDoc.data().keyword !== questionText) {
-                            await draftDoc.ref.update({
-                                variations: [...existingVariations, questionText]
-                            });
-                            serverLog(`[Auto-Learning] Grouped new question under existing reply for brand: ${brandId}`);
-                        }
-                    } else {
-                        // 4. Check if the question itself is already a draft
-                        const qDraftSnap = await db.collection('draft_replies')
-                            .where('brandId', '==', brandId)
-                            .where('keyword', '==', questionText)
-                            .get();
+                    const imageHashes = unrepliedReceived
+                        .filter(m => m.attachments && m.attachments[0]?.type === 'image')
+                        .map(m => m.attachments[0].pHash)
+                        .filter(h => h);
 
-                        if (qDraftSnap.empty) {
-                            // Create new draft entry in draft_replies
-                            await db.collection('draft_replies').add({
-                                brandId: brandData.id,
-                                keyword: questionText,
-                                result: text,
-                                status: 'new',
-                                type: 'auto_learned',
-                                timestamp: serverTimestamp(),
-                                variations: [],
-                                approvedVariations: [],
-                                metadata: {
-                                    psid: targetId,
-                                    source: 'dashboard_reply'
-                                }
-                            });
-                            serverLog(`[Auto-Learning] Logged new draft to draft_replies for brand: ${brandId}`);
-                        }
+                    if (aggregatedText.length > 2 || imageHashes.length > 0) {
+                        const keyword = aggregatedText || "Image Inquiry";
+                        const variations = (brandData.autoHyperIndex !== false) ? getLinguisticVariations(keyword) : [];
+                        
+                        await db.collection("draft_replies").add({
+                            keyword: keyword,
+                            result: text,
+                            variations: variations,
+                            imageHashes: imageHashes,
+                            status: 'pending',
+                            type: 'expert_learned',
+                            brandId: brandData.id,
+                            timestamp: serverTimestamp(),
+                            successCount: 0,
+                            metadata: { psid: targetId, source: 'dashboard_bulk_learn' }
+                        });
+                        serverLog(`[Bulk-Learn] Captured ${unrepliedReceived.length} messages for brand: ${brandId}`);
                     }
                 }
+            } catch (autoLearnError) {
+                serverLog(`[Bulk-Learn Error]: ${autoLearnError.message}`);
             }
-        } catch (autoLearnError) {
-            serverLog(`[Auto-Learning Error] FAILURE: ${autoLearnError.message}`);
         }
 
         // Success log

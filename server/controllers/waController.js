@@ -1,6 +1,6 @@
 const { db, serverTimestamp, getBrandByPlatformId } = require('../services/firestoreService');
 const { getDynamicModel } = require('../services/geminiService');
-const { getLinguisticVariations, normalizePhonetic } = require('../utils/linguisticEngine');
+const { getLinguisticVariations, normalizePhonetic, cleanNoise } = require('../utils/linguisticEngine');
 
 const serverLog = (msg) => console.log(`[WA Controller] ${msg}`);
 const { extractPhoneNumber, extractAddressSignals, detectBasicIntent } = require('../utils/extractors');
@@ -60,9 +60,9 @@ async function handleWAWebhook(req, res) {
 
             if (message.text) {
                 const text = message.text.body;
-                const messageId = message.id;
-                // Fire and forget
-                processIncomingWAMessage(sender_wa_id, text, brandData, messageId).catch(console.error);
+                processIncomingWAMessage(sender_wa_id, text, brandData, message.id).catch(console.error);
+            } else if (message.image) {
+                processIncomingWAMessage(sender_wa_id, null, brandData, message.id, message.image).catch(console.error);
             }
         }
         res.status(200).send('EVENT_RECEIVED');
@@ -71,15 +71,35 @@ async function handleWAWebhook(req, res) {
     }
 }
 
-async function processIncomingWAMessage(wa_id, text, brandData, messageId) {
-    if (!text) return;
-
+async function processIncomingWAMessage(wa_id, text, brandData, messageId, imageObj = null) {
     // 1. Log and get current state
-    const convoData = await logWAMessage(wa_id, text, brandData);
+    const convoData = await logWAMessage(wa_id, text || "[Image]", brandData);
+
+    if (imageObj) {
+        // Handle image via WhatsApp media API
+        const mediaUrl = await getWAMediaUrl(imageObj.id, brandData);
+        if (mediaUrl) {
+            await handleWAVisionResponse(wa_id, mediaUrl, text, brandData);
+        }
+        return;
+    }
+
+    if (!text) return;
 
     // ── NEW DETERMINISTIC FLOW (ManyChat Style) ──
     const flowHandled = await handleDeterministicFlow(wa_id, text, convoData, brandData);
     if (flowHandled) return;
+
+    // --- PHASE 4: Learning Mode (Passive Training) ---
+    if (brandData.isLearningMode) {
+        serverLog(`[WA LEARNING MODE] Active for ${brandData.name}. Skipping automated responses.`);
+        await db.collection('conversations').doc(wa_id).update({
+            status: 'pending',
+            isPriority: true,
+            lastUpdate: Date.now()
+        });
+        return; 
+    }
 
     // 2. Automated Lead Capture via Regex Extractors (Passive capture)
     const detectedPhone = extractPhoneNumber(text);
@@ -157,6 +177,7 @@ async function getApprovedInboxDraft(message, brandId, convoData) {
 
     const lowerText = message.toLowerCase();
     const normalizedInput = normalizePhonetic(lowerText);
+    const cleanedInput = cleanNoise(lowerText);
 
     const fuse = new Fuse(searchableRecords, {
         keys: ['phrase'],
@@ -165,12 +186,19 @@ async function getApprovedInboxDraft(message, brandId, convoData) {
         ignoreLocation: true
     });
 
-    // Try primary match then phonetic fallback
+    // Try primary match, then phonetic, then noise-cleaned fallback
     let results = fuse.search(lowerText);
     if (results.length === 0 || results[0].score > 0.2) {
         const phoneticResults = fuse.search(normalizedInput);
         if (phoneticResults.length > 0 && (!results[0] || phoneticResults[0].score < results[0].score)) {
             results = phoneticResults;
+        }
+    }
+    // 3rd pass: noise-stripped input (e.g. 'bhai dam koto?' -> 'dam koto?')
+    if ((results.length === 0 || results[0].score > 0.2) && cleanedInput !== lowerText) {
+        const cleanedResults = fuse.search(cleanedInput);
+        if (cleanedResults.length > 0 && (!results[0] || cleanedResults[0].score < results[0].score)) {
+            results = cleanedResults;
         }
     }
 
@@ -481,17 +509,130 @@ async function sendMessageFromDashboard(req, res) {
     if (!recipientId || !text || !brandId) return res.status(400).send('Missing fields');
 
     try {
-        const { getDoc, doc } = require('../services/firestoreService');
         const brandDoc = await db.collection('brands').doc(brandId).get();
         if (!brandDoc.exists) return res.status(404).send('Brand not found');
         const brandData = brandDoc.data();
         brandData.id = brandId;
 
         await sendWAMessage(recipientId, text, brandData);
+
+        // --- PHASE 3: Bulk Auto-Learning (Staff Training) ---
+        if (text && text.length > 2) {
+            try {
+                const msgSnap = await db.collection(`conversations/${recipientId}/messages`)
+                    .orderBy('timestamp', 'desc')
+                    .limit(15)
+                    .get();
+                
+                const messages = msgSnap.docs.map(d => d.data());
+                const firstSentIdx = messages.findIndex(m => m.type === 'sent');
+                const unrepliedReceived = (firstSentIdx === -1) 
+                    ? messages.filter(m => m.type === 'received')
+                    : messages.slice(0, (firstSentIdx === -1 ? messages.length : firstSentIdx)).filter(m => m.type === 'received');
+
+                if (unrepliedReceived.length > 0) {
+                    const aggregatedText = unrepliedReceived
+                        .filter(m => m.text && m.text !== "[Image]")
+                        .reverse()
+                        .map(m => m.text)
+                        .join(" ");
+
+                    // WhatsApp image handling might vary, assuming we store it simply
+                    if (aggregatedText.length > 2) {
+                        const variations = (brandData.autoHyperIndex !== false) ? getLinguisticVariations(aggregatedText) : [];
+                        await db.collection("draft_replies").add({
+                            keyword: aggregatedText,
+                            result: text,
+                            variations: variations,
+                            status: 'pending',
+                            type: 'expert_learned',
+                            brandId: brandData.id,
+                            timestamp: serverTimestamp(),
+                            successCount: 0,
+                            metadata: { wa_id: recipientId, source: 'wa_dashboard_bulk_learn' }
+                        });
+                        serverLog(`[WA Bulk-Learn] Captured context for brand: ${brandId}`);
+                    }
+                }
+            } catch (e) {
+                serverLog(`[WA Auto-Learn Error]: ${e.message}`);
+            }
+        }
+
         res.json({ success: true });
     } catch (error) {
         serverLog(`[WA SEND ERROR]: ${error.message}`);
         res.status(500).json({ error: error.message });
+    }
+}
+
+/**
+ * WhatsApp Vision Handler (Non-AI Focus)
+ */
+async function handleWAVisionResponse(wa_id, imageUrl, text, brandData) {
+    try {
+        // --- PHASE 4: Learning Mode Check ---
+        if (brandData.isLearningMode) {
+            serverLog(`[WA Vision Learning Mode] Skipping auto-reply for image.`);
+            await db.collection('conversations').doc(wa_id).update({
+                status: 'pending',
+                isPriority: true,
+                lastUpdate: Date.now()
+            });
+            return;
+        }
+
+        const { generatePHash, getHammingDistance } = require('../services/imageFingerprintService');
+        const { findProductByPHash } = require('../services/productFingerprintService');
+        
+        const incomingHash = await generatePHash(imageUrl);
+        if (!incomingHash) return;
+
+        // 1. Zero-Token Product Match
+        const productMatch = await findProductByPHash(brandData.id, incomingHash);
+        if (productMatch) {
+            const reply = `আপনার পাঠানো ছবিটি আমাদের "${productMatch.productName}" এর। এর দাম ${productMatch.offerPrice || productMatch.price} টাকা। আপনি কি এটি অর্ডার করতে চান? ✨`;
+            await sendWAMessage(wa_id, reply, brandData);
+            return;
+        }
+
+        // 2. OCR + Context Fallback (Tesseract)
+        try {
+            const Tesseract = require('tesseract.js');
+            const { data: { text: ocrText } } = await Tesseract.recognize(imageUrl, 'ben+eng');
+            
+            const historySnap = await db.collection(`conversations/${wa_id}/messages`)
+                .orderBy('timestamp', 'desc')
+                .limit(2)
+                .get();
+            const precedingText = historySnap.docs.find(d => d.data().type === 'received' && d.data().text !== "[Image]")?.data()?.text || "";
+            const context = (precedingText + " " + (ocrText || "")).trim();
+
+            if (context.length > 5) {
+                const matchedReply = await getApprovedInboxDraft(context, brandData.id, {});
+                if (matchedReply) {
+                    await sendWAMessage(wa_id, matchedReply.text, brandData);
+                    return;
+                }
+            }
+        } catch (e) { console.error(e); }
+
+        serverLog(`[WA Vision] No non-AI match found. Moving to staff dashboard.`);
+    } catch (e) {
+        serverLog(`[WA Vision Error]: ${e.message}`);
+    }
+}
+
+async function getWAMediaUrl(mediaId, brandData) {
+    try {
+        const response = await axios.get(
+            `https://graph.facebook.com/v17.0/${mediaId}`,
+            { headers: { Authorization: `Bearer ${brandData.waAccessToken}` } }
+        );
+        return response.data.url;
+    } catch (e) {
+        serverLog(`[WA Media Error]: ${e.message}`);
+        return null;
     }
 }
 

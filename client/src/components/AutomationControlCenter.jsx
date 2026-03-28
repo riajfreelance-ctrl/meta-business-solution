@@ -79,7 +79,7 @@ const AutomationControlCenter = () => {
         </div>
     );
 
-    if (loading) return <div className="p-20 text-center animate-pulse text-prime-500 font-black tracking-widest uppercase italic">Initializing Control Deck...</div>;
+    if (loading) return <div className="p-20 text-center animate-pulse text-prime-500 font-black tracking-widest uppercase ">Initializing Control Deck...</div>;
 
     return (
         <div className="p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
