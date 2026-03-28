@@ -9,18 +9,12 @@ const serviceAccountPath = path.join(process.cwd(), 'server', 'firebase-service-
 let serviceAccount;
 try {
   if (fs.existsSync(serviceAccountPath)) {
-    serviceAccount = require(serviceAccountPath);
+    serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
   } else {
-    // Try relative fallback for some Vercel structures
+    // Relative fallback
     const altPath = path.join(__dirname, '..', 'firebase-service-account.json');
     if (fs.existsSync(altPath)) {
-      serviceAccount = require(altPath);
-    } else {
-       // Deeply alternative path check for internal bundling
-       const bundlePath = path.join(__dirname, 'firebase-service-account.json');
-       if (fs.existsSync(bundlePath)) {
-          serviceAccount = require(bundlePath);
-       }
+      serviceAccount = JSON.parse(fs.readFileSync(altPath, 'utf8'));
     }
   }
 } catch (e) {

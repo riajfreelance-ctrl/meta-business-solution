@@ -60,11 +60,6 @@ async function verifyWebhook(req, res) {
 // Handle Webhook Post
 async function handleWebhookPost(req, res) {
     try {
-        // 0. Heart-beat log for debugging
-        await db.collection('system_hits').add({ path: '/webhook', timestamp: Date.now() }).catch((err) => {
-            console.error('DIAGNOSTICS ERROR:', err.message);
-        });
-
         // 0. HMAC Signature Validation (Security Phase 1)
         const signature = req.headers['x-hub-signature-256'] || req.headers['x-hub-signature'];
         const appSecret = process.env.APP_SECRET;
@@ -75,20 +70,12 @@ async function handleWebhookPost(req, res) {
             const digest = 'sha256=' + hmac.digest('hex');
             
             if (signature !== digest) {
-                serverLog(`[SECURITY] Webhook signature mismatch! Remote: ${signature}, Local: ${digest}`);
-                // Log to Firestore for remote debugging
-                db.collection('system_errors').add({
-                    type: 'signature_mismatch',
-                    remote: signature,
-                    local: digest,
-                    timestamp: Date.now()
-                }).catch(() => {});
+                serverLog(`[SECURITY] Webhook signature mismatch!`);
+                if (process.env.NODE_ENV === 'production') return res.sendStatus(403);
             }
         }
 
         let body = req.body;
-        serverLog(`[WEBHOOK] Object: ${body.object}`);
-        
         const isFB = body.object === 'page';
         const isIG = body.object === 'instagram';
 
@@ -138,7 +125,7 @@ async function handleWebhookPost(req, res) {
         }
     } catch (e) {
         console.error('[CRITICAL] Webhook Error:', e.message);
-        res.status(200).send('EVENT_RECEIVED'); // Always 200 for Meta
+        res.status(200).send('EVENT_RECEIVED'); 
     }
 }
 
