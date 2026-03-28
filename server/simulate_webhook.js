@@ -63,6 +63,9 @@ async function runTests() {
     // 3. Comment - AI Discovery
     await simulateComment('প্রোডাক্ট টি খুব ভালো মনে হচ্ছে!');
 
+    // 4. Audio - Voice Intelligence
+    await simulateAudio('https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3');
+
     console.log('\n✅ Simulation Triggered. Check the Dashboard (Inbox & Logs).');
 }
 

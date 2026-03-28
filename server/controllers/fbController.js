@@ -492,7 +492,7 @@ async function processThreadedMessage(sender_psid, message, brandData, platformT
 
         // ── GHOST MODE: Only mark as read if we are actually replying ──
         serverLog(`[Inbox] Checking Deterministic Flow for ${sender_psid}...`);
-        const flowHandled = await handleDeterministicFlow(sender_psid, message.text, convoData, brandData)
+        const flowHandled = await handleDeterministicFlow(sender_psid, message?.text || "", convoData, brandData)
             .catch(e => { serverLog(`[Error] handleDeterministicFlow: ${e.message}`); return false; });
             
         if (flowHandled) {
@@ -557,9 +557,10 @@ async function processThreadedMessage(sender_psid, message, brandData, platformT
     autoTagCustomer(sender_psid, brandData.id, brandData.googleAIKey).catch(() => {});
 
     // ── Phase 5: Smart Sentiment Routing ─────────────────────────────────────
+    const messageText = message?.text || "";
     const angryKeywords = ['angry', 'fraud', 'cheat', 'খারাপ', 'প্রতারণা', 'ঠকানো', 'refund', 'cancel', 'বাতিল'];
-    const isAngry = angryKeywords.some(k => message.text.toLowerCase().includes(k));
-    if (isAngry) {
+    const isAngry = angryKeywords.some(k => messageText.toLowerCase().includes(k));
+    if (isAngry && messageText) {
         db.collection('conversations').doc(sender_psid)
           .set({ isPriority: true, sentiment: 'Angry' }, { merge: true });
         serverLog(`[SENTIMENT] Angry signal from ${sender_psid} — marked as priority`);
@@ -572,8 +573,8 @@ async function processThreadedMessage(sender_psid, message, brandData, platformT
     //     const answer = snapshot.docs[0].data().answer;
     //     await sendAndLog(sender_psid, answer, 'bot', brandData);
     // } else {
-        // ── DRAFT FIRST CHECK ──
-        const matchedReply = await getApprovedInboxDraft(message.text, brandData.id, convoData);
+    // ── DRAFT FIRST CHECK ──
+    const matchedReply = await getApprovedInboxDraft(messageText, brandData.id, convoData);
         if (matchedReply) {
             serverLog(`[DRAFT] Approved match found for: ${message.text}`);
             await sendAndLog(sender_psid, matchedReply.result, 'bot', brandData);

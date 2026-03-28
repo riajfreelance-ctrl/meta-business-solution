@@ -104,7 +104,8 @@ async function processIncomingWAMessage(wa_id, text, brandData, messageId, image
     if (!text) return;
 
     // ── NEW DETERMINISTIC FLOW (ManyChat Style) ──
-    const flowHandled = await handleDeterministicFlow(wa_id, text, convoData, brandData);
+    const lowerText = (text || "").toLowerCase();
+    const flowHandled = await handleDeterministicFlow(wa_id, text || "", convoData, brandData);
     if (flowHandled) return;
 
     // --- PHASE 4: Learning Mode (Passive Training) ---
@@ -138,7 +139,6 @@ async function processIncomingWAMessage(wa_id, text, brandData, messageId, image
     }
 
     // 3. Knowledge Base Check
-    const lowerText = text.toLowerCase();
     const kbSnap = await db.collection('knowledge_base')
         .where('brandId', '==', brandData.id)
         .where('keywords', 'array-contains', lowerText)
@@ -442,7 +442,7 @@ async function linkConversationsByPhone(convoId, phone, brandId) {
  */
 async function handleDeterministicFlow(wa_id, text, convoData, brandData) {
     const state = convoData.botState || 'IDLE';
-    const lowerText = text.toLowerCase();
+    const lowerText = (text || "").toLowerCase();
 
     // 1. GREETING -> START ORDER FLOW
     const basicIntent = detectBasicIntent(text);
