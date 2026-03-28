@@ -401,7 +401,7 @@ async function logWAMessage(wa_id, text, brandData) {
         brandId: brandData.id,
         platform: 'whatsapp',
         timestamp: serverTimestamp(),
-        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+        time: new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Dhaka"})).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
     });
 
     return { ...currentData, ...updateData };
