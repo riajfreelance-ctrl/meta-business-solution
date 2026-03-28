@@ -511,8 +511,18 @@ async function processThreadedMessage(sender_psid, message, brandData, platformT
             return; // Exit here - let the human agent reply so we can learn
         }
 
-    // 1. Handle Image Attachments (Visual Shopping)
+    // 1. Handle Voice/Audio Attachments (Phase 5)
     if (message.attachments && message.attachments.length > 0) {
+        const audioAtt = message.attachments.find(att => att.type === 'audio');
+        if (audioAtt) {
+            const { transcribeAudio } = require('../services/audioService');
+            const transcription = await transcribeAudio(audioAtt.payload.url, brandData);
+            if (transcription) {
+                serverLog(`[VOICE] Transcribed ${sender_psid}: "${transcription}"`);
+                message.text = transcription; // Feed into text matching flow
+            }
+        }
+
         const imageAtt = message.attachments.find(att => att.type === 'image');
         if (imageAtt) {
             const aiSettings = brandData.aiSettings || {};

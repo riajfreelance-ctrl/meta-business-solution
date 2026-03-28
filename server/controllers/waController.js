@@ -63,6 +63,9 @@ async function handleWAWebhook(req, res) {
                 processIncomingWAMessage(sender_wa_id, text, brandData, message.id).catch(console.error);
             } else if (message.image) {
                 processIncomingWAMessage(sender_wa_id, null, brandData, message.id, message.image).catch(console.error);
+            } else if (message.voice || message.audio) {
+                const audioObj = message.voice || message.audio;
+                processIncomingWAMessage(sender_wa_id, null, brandData, message.id, null, audioObj).catch(console.error);
             }
         }
         res.status(200).send('EVENT_RECEIVED');
@@ -71,7 +74,7 @@ async function handleWAWebhook(req, res) {
     }
 }
 
-async function processIncomingWAMessage(wa_id, text, brandData, messageId, imageObj = null) {
+async function processIncomingWAMessage(wa_id, text, brandData, messageId, imageObj = null, audioObj = null) {
     // 1. Log and get current state
     const convoData = await logWAMessage(wa_id, text || "[Image]", brandData);
 
@@ -82,6 +85,20 @@ async function processIncomingWAMessage(wa_id, text, brandData, messageId, image
             await handleWAVisionResponse(wa_id, mediaUrl, text, brandData);
         }
         return;
+    }
+
+    if (audioObj) {
+        // Handle voice/audio transcription (Phase 5)
+        const mediaUrl = await getWAMediaUrl(audioObj.id, brandData);
+        if (mediaUrl) {
+            const { transcribeAudio } = require('../services/audioService');
+            const transcription = await transcribeAudio(mediaUrl, brandData, brandData.whatsappToken);
+            if (transcription) {
+                serverLog(`[WA VOICE] Transcribed ${wa_id}: "${transcription}"`);
+                text = transcription;
+                // Continue to normal text matching
+            }
+        }
     }
 
     if (!text) return;
