@@ -40,7 +40,7 @@ const app = express()
     });
 
 // Main Endpoints (Explicit /api prefix for Vercel)
-app.get('/api/status', (req, res) => res.json({ status: 'API Alive', version: '2.0.0-final' }));
+app.get('/api/status', (req, res) => res.json({ status: 'API Alive', version: '2.0.1-diagnostic' }));
 app.get('/webhook', fbController.verifyWebhook); 
 app.post('/webhook', fbController.handleWebhookPost);
 app.get('/api/webhook', fbController.verifyWebhook); // Safety for both paths
