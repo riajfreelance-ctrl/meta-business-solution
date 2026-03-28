@@ -46,7 +46,7 @@ app.post('/webhook', fbController.handleWebhookPost);
 app.get('/api/webhook', fbController.verifyWebhook); // Safety for both paths
 app.post('/api/webhook', fbController.handleWebhookPost); // Safety for both paths
 
-app.get('/ping', async (req, res) => {
+app.get('/api/ping', async (req, res) => {
   try {
     const { db } = require('./services/firestoreService');
     const snap = await db.collection('brands').limit(1).get();
