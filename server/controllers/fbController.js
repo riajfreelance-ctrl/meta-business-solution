@@ -1030,7 +1030,7 @@ async function logUserMessage(psid, message, brandData, platformType = 'facebook
         platform: platformType,
         platform: platformType,
         timestamp: serverTimestamp(),
-        time: new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Dhaka"})).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+        time: new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true })
     });
 
     serverLog(`[LogMsg] Completed for ${psid}`);
@@ -1272,7 +1272,7 @@ async function handleEchoMessage(webhook_event, brandData) {
             brandId: brandData.id,
             platform: 'facebook',
             timestamp: serverTimestamp(),
-            time: new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Dhaka"})).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+            time: new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true })
         });
 
         // Update parent conversation
@@ -1503,7 +1503,7 @@ async function sendMessageFromDashboard(req, res) {
                 brandId: brandData.id,
                 platform: 'facebook',
                 timestamp: serverTimestamp(),
-                time: new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Dhaka"})).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+                time: new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true })
             });
 
             // Update parent conversation
