@@ -10,6 +10,10 @@ let serviceAccount;
 try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    // Fix for private key newlines in Vercel env vars
+    if (serviceAccount.private_key) {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+    }
   } else if (fs.existsSync(serviceAccountPath)) {
     serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
   } else {
@@ -24,17 +28,19 @@ try {
 }
 
 if (!admin.apps.length) {
-  if (serviceAccount) {
+  if (serviceAccount && serviceAccount.private_key) {
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       storageBucket: "advance-automation-8029e.firebasestorage.app"
     });
+    console.log('Firebase initialized with Service Account from Env/File');
   } else {
     // Fallback to project ID (works if authorized via gcloud or on GCP)
     admin.initializeApp({
       projectId: "advance-automation-8029e",
       storageBucket: "advance-automation-8029e.firebasestorage.app"
     });
+    console.log('Firebase initialized with Project ID Fallback (might fail without credentials)');
   }
 }
 

@@ -27,7 +27,17 @@ async function sendMessage(psid, response, accessToken, replyToId = null) {
         await axios.post(`https://graph.facebook.com/v21.0/me/messages?access_token=${token}`, body);
         serverLog(`Message sent to ${psid}${replyToId ? ' (Replied to ' + replyToId + ')' : ''}`);
     } catch (e) {
-        serverLog(`Send error: ${e.response?.data?.error?.message || e.message}`);
+        const errMsg = e.response?.data?.error?.message || e.message;
+        serverLog(`Send error: ${errMsg}`);
+        
+        // Log error to Firestore for dashboard visibility
+        const { db } = require('./firestoreService');
+        await db.collection('logs').add({
+            type: 'send_error',
+            psid: psid,
+            error: errMsg,
+            timestamp: Date.now()
+        }).catch(() => {});
     }
 }
 
@@ -39,7 +49,16 @@ async function replyToComment(commentId, message, accessToken) {
         });
         serverLog(`Replied to comment ${commentId}`);
     } catch (e) {
-        serverLog(`Comment reply error: ${e.response?.data?.error?.message || e.message}`);
+        const errMsg = e.response?.data?.error?.message || e.message;
+        serverLog(`Comment reply error: ${errMsg}`);
+        
+        const { db } = require('./firestoreService');
+        await db.collection('logs').add({
+            type: 'comment_error',
+            commentId,
+            error: errMsg,
+            timestamp: Date.now()
+        }).catch(() => {});
     }
 }
 

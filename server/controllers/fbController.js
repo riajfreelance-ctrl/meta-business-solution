@@ -131,7 +131,6 @@ async function handleWebhookPost(req, res) {
                         // Fallback brand identification for messages
                         if (!brandData && webhook_event.recipient?.id) {
                             brandData = await getBrandByPlatformId(webhook_event.recipient.id, platformType);
-                            if (brandData) serverLog(`[WEBHOOK SUCCESS] Matched Brand from recipient ID fallback: ${brandData.name}`);
                         }
 
                         if (!brandData) {
@@ -155,14 +154,14 @@ async function handleWebhookPost(req, res) {
 
                 if (entry.changes) {
                     for (const change of entry.changes) {
-                        // Fallback brand identification for comments
-                        if (!brandData) {
-                             // For comments, we might need a different lookup if platformId fails
-                             // but usually entry.id is the page id
-                        }
-                        
                         if (brandData && change.field === 'feed' && change.value.item === 'comment' && change.value.verb === 'add') {
                             tasks.push(processIncomingComment(change.value, brandData));
+                        } else if (!brandData && change.field === 'feed') {
+                            // Fallback lookup specifically for comments if main lookup failed
+                            const fallbackBrand = await getBrandByPlatformId('963307416870090', 'facebook');
+                            if (fallbackBrand && change.value.item === 'comment' && change.value.verb === 'add') {
+                                tasks.push(processIncomingComment(change.value, fallbackBrand));
+                            }
                         }
                     }
                 }
@@ -691,10 +690,17 @@ async function processThreadedMessage(sender_psid, message, brandData, platformT
         // Step 9: Auto-tag (async, non-blocking)
         autoTagCustomer(sender_psid, brandData.id, brandData.googleAIKey).catch(() => {});
 
-        // ═══════════════════════════════════════════════════════
-        // STEP 10: CORE AUTO-REPLY ENGINE
-        // Priority: Draft Center → AI Fallback → Pending
-        // ═══════════════════════════════════════════════════════
+        // Update top-level conversation summary for inbox list & sorting
+        const nowMs = Date.now();
+        await db.collection('conversations').doc(sender_psid).set({
+            lastMessage: messageText.substring(0, 100),
+            lastMessageTimestamp: nowMs,
+            timestamp: nowMs,
+            platform: platformType,
+            brandId: brandData.id,
+            unread: true
+        }, { merge: true });
+
         serverLog(`[AUTO-REPLY] Starting for: "${messageText}" | Brand: ${brandData.name} (id: ${brandData.id})`);
 
         if (systemAutoReply) {
