@@ -81,17 +81,19 @@ async function handleWebhookPost(req, res) {
 
         if (isFB || isIG) {
             const tasks = [];
-            for (const entry of body.entry) {
-                const platformId = entry.id;
-                const platformType = isIG ? 'instagram' : 'facebook';
-                const brandData = await getBrandByPlatformId(platformId, platformType);
-                
-                if (!brandData) {
-                    serverLog(`[WARNING] No brand found for ${platformType} ID: ${platformId}`);
-                    continue;
-                }
+        for (const entry of body.entry) {
+            const platformId = entry.id;
+            const platformType = isIG ? 'instagram' : 'facebook';
+            serverLog(`[WEBHOOK] Entry.id: ${platformId} | Type: ${platformType}`);
+            const brandData = await getBrandByPlatformId(platformId, platformType);
+            
+            if (!brandData) {
+                serverLog(`[WEBHOOK ERROR] Brand not found for PageID: ${platformId}`);
+                continue;
+            }
+            serverLog(`[WEBHOOK SUCCESS] Matched Brand: ${brandData.name} (${brandData.id})`);
 
-                if (entry.messaging) {
+            if (entry.messaging) {
                     const webhook_event = entry.messaging[0];
                     const sender_psid = webhook_event.sender.id;
                     webhook_event.platform = platformType;
@@ -317,18 +319,28 @@ async function getShuffledReply(message, brandId, postId = null) {
     return null;
 }
 
-// ── DETERMINISTIC BOT: Match Approved Inbox Drafts via Fuzzy NLP ──
+// ── DETERMINISTIC BOT: Match Approved Inbox Rules via Unified Engine ──
 async function getApprovedInboxDraft(message, brandId, convoData) {
     const lowerText = message.toLowerCase();
-    const snapshot = await db.collection("draft_replies")
-        .where("brandId", "==", brandId)
-        .where("status", "==", "approved")
-        .get();
     
-    const drafts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // 1. Concurrent Fetch from both Rulesets
+    const [draftSnap, kbSnap] = await Promise.all([
+        db.collection("draft_replies")
+            .where("brandId", "==", brandId)
+            .where("status", "==", "approved")
+            .get(),
+        db.collection("knowledge_base")
+            .where("brandId", "==", brandId)
+            .get()
+    ]);
+    
+    const drafts = draftSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const kbRules = kbSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    // Flatten data for Fuse.js
+    // 2. Normalize and Flatten data for Fuse.js
     const searchableRecords = [];
+    
+    // Process Drafts (keyword, variations, approvedVariations -> result)
     drafts.forEach(draft => {
         const allPhrases = new Set([
             draft.keyword, 
@@ -336,9 +348,19 @@ async function getApprovedInboxDraft(message, brandId, convoData) {
             ...(draft.approvedVariations || []),
             normalizePhonetic(draft.keyword)
         ]);
-        
         allPhrases.forEach(phrase => {
-            if (phrase) searchableRecords.push({ phrase, result: draft.result, draftId: draft.id });
+            if (phrase) searchableRecords.push({ phrase, result: draft.result, draftId: draft.id, type: 'draft' });
+        });
+    });
+
+    // Process Knowledge Base (keywords[] -> answer)
+    kbRules.forEach(rule => {
+        const allPhrases = new Set([
+            ...(rule.keywords || []),
+            ...(rule.keywords ? rule.keywords.map(kw => normalizePhonetic(kw)) : [])
+        ]);
+        allPhrases.forEach(phrase => {
+            if (phrase) searchableRecords.push({ phrase, result: rule.answer, ruleId: rule.id, type: 'kb' });
         });
     });
 
@@ -347,7 +369,7 @@ async function getApprovedInboxDraft(message, brandId, convoData) {
     const normalizedInput = normalizePhonetic(lowerText);
     const cleanedInput = cleanNoise(lowerText);
 
-    // Configure Fuse for fuzzy matching
+    // 3. Configure Fuse for fuzzy matching
     const fuse = new Fuse(searchableRecords, {
         keys: ['phrase'],
         includeScore: true,
@@ -355,15 +377,16 @@ async function getApprovedInboxDraft(message, brandId, convoData) {
         ignoreLocation: true
     });
 
-    // Try direct match, then phonetic fallback, then noise-cleaned fallback
+    // Strategy: Exact match priority -> Phonetic -> Cleaned Noise
     let results = fuse.search(lowerText);
+    
     if (results.length === 0 || results[0].score > 0.2) {
         const phoneticResults = fuse.search(normalizedInput);
         if (phoneticResults.length > 0 && (!results[0] || phoneticResults[0].score < results[0].score)) {
             results = phoneticResults;
         }
     }
-    // 3rd pass: try with noise words stripped (e.g. 'bhai price koto?' -> 'price koto?')
+    
     if ((results.length === 0 || results[0].score > 0.2) && cleanedInput !== lowerText) {
         const cleanedResults = fuse.search(cleanedInput);
         if (cleanedResults.length > 0 && (!results[0] || cleanedResults[0].score < results[0].score)) {
@@ -372,21 +395,19 @@ async function getApprovedInboxDraft(message, brandId, convoData) {
     }
     
     if (results.length > 0) {
-        // ── OPTION 1: PRIORITIZE SUCCESSFUL REPLIES ──
-        // Sort results: Perfect matches (score < 0.1) first, then by successCount
+        // Prioritize KB over Drafts if scores are similar
         results.sort((a, b) => {
-            if (a.score < 0.1 && b.score >= 0.1) return -1;
-            if (b.score < 0.1 && a.score >= 0.1) return 1;
-            const countA = drafts.find(d => d.id === a.item.draftId)?.successCount || 0;
-            const countB = drafts.find(d => d.id === b.item.draftId)?.successCount || 0;
-            return countB - countA;
+            if (Math.abs(a.score - b.score) < 0.05) {
+                if (a.item.type === 'kb' && b.item.type === 'draft') return -1;
+                if (b.item.type === 'kb' && a.item.type === 'draft') return 1;
+            }
+            return a.score - b.score;
         });
 
         const bestMatch = results[0];
         if (bestMatch.score <= 0.35) {
             let resultText = bestMatch.item.result;
             
-            // ── OPTION 5: MOOD-TARGETED TONE INJECTION ──
             const sentiment = convoData?.sentiment || 'Neutral';
             if (sentiment === 'Negative') {
                 const apologies = [
@@ -398,28 +419,23 @@ async function getApprovedInboxDraft(message, brandId, convoData) {
                 resultText = prefix + resultText;
             }
             
-            serverLog(`[Phonetic Match] Score: ${bestMatch.score.toFixed(3)} | Input: ${lowerText} | Match: ${bestMatch.item.phrase}`);
-            return { text: resultText, draftId: bestMatch.item.draftId };
+            serverLog(`[Unified Match] Score: ${bestMatch.score.toFixed(3)} | Type: ${bestMatch.item.type} | Input: ${lowerText} | Match: ${bestMatch.item.phrase}`);
+            return { text: resultText, result: resultText, draftId: bestMatch.item.ruleId || bestMatch.item.draftId };
         }
     }
 
-    // Try basic keyword intent matcher bridging
+    // 4. Intent Fallback (e.g. Price detection if fuzzy fails)
     const basicIntent = detectBasicIntent(message);
     if (basicIntent.intent !== 'UNKNOWN') {
-        serverLog(`[NLP Deterministic] Fallback Intent Matched: ${basicIntent.intent}`);
-        // Quick look for a draft matching this intent name exactly
-        const intentDoc = await db.collection('draft_replies')
-            .where('brandId', '==', brandId)
-            .where('keyword', '==', basicIntent.intent.replace('ASK_', '').charAt(0).toUpperCase() + basicIntent.intent.replace('ASK_', '').toLowerCase().slice(1)) // ASK_PRICE -> Price
-            .where('status', '==', 'approved')
-            .limit(1)
-            .get();
-            
-        if (!intentDoc.empty) {
-            const data = intentDoc.docs[0].data();
-            serverLog(`[NLP Match] Found intent-based draft for ${basicIntent.intent}`);
-            return { result: data.result, draftId: intentDoc.docs[0].id };
-        }
+        const intentKeyword = basicIntent.intent.replace('ASK_', '').charAt(0).toUpperCase() + basicIntent.intent.replace('ASK_', '').toLowerCase().slice(1);
+        
+        // Check KB first for Intent
+        const intentMatch = kbRules.find(r => r.keywords?.some(kw => kw.toLowerCase() === intentKeyword.toLowerCase()));
+        if (intentMatch) return { text: intentMatch.answer, result: intentMatch.answer, draftId: intentMatch.id };
+        
+        // Fallback to Drafts
+        const draftMatch = drafts.find(d => d.keyword?.toLowerCase() === intentKeyword.toLowerCase());
+        if (draftMatch) return { text: draftMatch.result, result: draftMatch.result, draftId: draftMatch.id };
     }
 
     return null;
@@ -871,13 +887,6 @@ async function handleVisionResponse(psid, imageUrl, text, brandData) {
 /**
  * REFINED FILTER: Collect basic greetings but ignore binary Yes/No/Ok.
  */
-function shouldCaptureAsDraft(text) {
-    if (!text || typeof text !== 'string') return false;
-    const clean = text.trim().toLowerCase();
-    const blacklist = ['হাঁ', 'না', 'হ্যাঁ', 'ok', 'hm', 'hmm', 'yes', 'no', 'okey', 'thx', 'ty', 'thanks', 'ধন্যবাদ'];
-    if (blacklist.includes(clean)) return false;
-    return clean.length >= 2 && clean.length < 200;
-}
 
 async function sendAndLog(psid, text, type, brandData) {
     if (!text) return;
@@ -1170,6 +1179,20 @@ function extractLeadInfo(text) {
     return info;
 }
 
+/**
+ * REFINED FILTER: Collect basic greetings but ignore binary Yes/No/Ok.
+ */
+function shouldCaptureAsDraft(text) {
+    if (!text || typeof text !== 'string') return false;
+    const clean = text.trim().toLowerCase();
+    const blacklist = ['হাঁ', 'না', 'হ্যাঁ', 'ok', 'hm', 'hmm', 'yes', 'no', 'okey', 'thx', 'ty', 'thanks', 'ধন্যবাদ'];
+    if (blacklist.includes(clean)) return false;
+    // Expanded blacklist for common filler words that shouldn't be training data
+    const fillers = ['ji', 'g', 'ji bhai', 'g bhai', 'acha', 'accha', 'thik ace', 'thik ache', 'ok', 'okay'];
+    if (fillers.includes(clean)) return false;
+    return clean.length >= 2 && clean.length < 500;
+}
+
 async function handleEchoMessage(webhook_event, brandData) {
     const psid = webhook_event.recipient.id;
     const text = webhook_event.message.text;
@@ -1184,20 +1207,32 @@ async function handleEchoMessage(webhook_event, brandData) {
                 .limit(15)
                 .get();
             
-            const messages = msgSnap.docs.map(d => d.data());
-            // In an echo, the current message (text) is already 'sent'.
-            // So we skip the first 'sent' message to find the preceding unreplied 'received' block.
-            const sentMessages = messages.filter(m => m.type === 'sent');
-            const unrepliedReceived = (sentMessages.length <= 1)
-                ? messages.filter(m => m.type === 'received')
-                : messages.slice(messages.indexOf(sentMessages[1])).filter(m => m.type === 'received');
+                const messages = msgSnap.docs.map(d => d.data());
+                
+                // --- NEW ROBUST DETECTION ---
+                // Find the first index where a customer message (received) exists
+                const firstReceivedIdx = messages.findIndex(m => m.type === 'received');
+                
+                if (firstReceivedIdx === -1) {
+                    serverLog(`[Passive-Learn] No received messages found in last 15. Skipping.`);
+                    return;
+                }
 
-            if (unrepliedReceived.length > 0) {
-                const aggregatedText = unrepliedReceived
-                    .filter(m => m.text)
-                    .reverse()
-                    .map(m => m.text)
-                    .join(" ");
+                // Now find the first 'sent' message that appears BEFORE (older than) that received message
+                // Remember: index 0 is newest, so 'before' means a HIGHER index.
+                const lastSentIdx = messages.findIndex((m, idx) => idx > firstReceivedIdx && m.type === 'sent');
+
+                const unrepliedReceived = (lastSentIdx === -1)
+                    ? messages.slice(firstReceivedIdx).filter(m => m.type === 'received')
+                    : messages.slice(firstReceivedIdx, lastSentIdx).filter(m => m.type === 'received');
+                // ----------------------------
+
+                if (unrepliedReceived.length > 0) {
+                    const aggregatedText = unrepliedReceived
+                        .filter(m => m.text)
+                        .reverse()
+                        .map(m => m.text)
+                        .join(" ");
 
                 const imageHashes = unrepliedReceived
                     .filter(m => m.attachments && m.attachments[0]?.type === 'image')
@@ -1226,6 +1261,31 @@ async function handleEchoMessage(webhook_event, brandData) {
         } catch (e) {
             serverLog(`[Passive-Learn Error]: ${e.message}`);
         }
+    }
+
+    // --- NEW: Persist External Echo Reply in History ---
+    try {
+        await db.collection(`conversations/${psid}/messages`).add({
+            text: text || '',
+            type: 'sent',
+            sender_id: brandData.facebookPageId,
+            brandId: brandData.id,
+            platform: 'facebook',
+            timestamp: serverTimestamp(),
+            time: new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Dhaka"})).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+        });
+
+        // Update parent conversation
+        await db.collection('conversations').doc(psid).set({
+            lastMessage: text,
+            lastMessageTimestamp: Date.now(),
+            unread: false,
+            status: 'replied'
+        }, { merge: true });
+
+        serverLog(`[History] External echo reply persisted for ${psid}`);
+    } catch (historyError) {
+        serverLog(`[History Error]: ${historyError.message}`);
     }
 }
 
@@ -1370,7 +1430,7 @@ async function sendMessageFromDashboard(req, res) {
         }
 
         // --- PHASE 3: Bulk Auto-Learning (Staff Training) ---
-        if (text && text.length > 2) {
+        if (shouldCaptureAsDraft(text)) {
             try {
                 // Find all 'received' messages since the last 'sent' message
                 const msgSnap = await db.collection(`conversations/${targetId}/messages`)
@@ -1379,10 +1439,24 @@ async function sendMessageFromDashboard(req, res) {
                     .get();
                 
                 const messages = msgSnap.docs.map(d => d.data());
-                const firstSentIdx = messages.findIndex(m => m.type === 'sent');
-                const unrepliedReceived = (firstSentIdx === -1) 
-                    ? messages.filter(m => m.type === 'received')
-                    : messages.slice(0, (firstSentIdx === -1 ? messages.length : firstSentIdx)).filter(m => m.type === 'received');
+                
+                // --- NEW ROBUST DETECTION ---
+                // Find the first index where a customer message (received) exists
+                const firstReceivedIdx = messages.findIndex(m => m.type === 'received');
+                
+                if (firstReceivedIdx === -1) {
+                    serverLog(`[Bulk-Learn] No received messages found in last 15. Skipping.`);
+                    return;
+                }
+
+                // Now find the first 'sent' message that appears BEFORE (older than) that received message
+                // Remember: index 0 is newest, so 'before' means a HIGHER index.
+                const lastSentIdx = messages.findIndex((m, idx) => idx > firstReceivedIdx && m.type === 'sent');
+
+                const unrepliedReceived = (lastSentIdx === -1)
+                    ? messages.slice(firstReceivedIdx).filter(m => m.type === 'received')
+                    : messages.slice(firstReceivedIdx, lastSentIdx).filter(m => m.type === 'received');
+                // ----------------------------
 
                 if (unrepliedReceived.length > 0) {
                     const aggregatedText = unrepliedReceived
@@ -1418,6 +1492,31 @@ async function sendMessageFromDashboard(req, res) {
             } catch (autoLearnError) {
                 serverLog(`[Bulk-Learn Error]: ${autoLearnError.message}`);
             }
+        }
+
+        // --- NEW: Persist Dashboard Reply in History ---
+        try {
+            await db.collection(`conversations/${targetId}/messages`).add({
+                text: text || '',
+                type: 'sent',
+                sender_id: brandData.facebookPageId,
+                brandId: brandData.id,
+                platform: 'facebook',
+                timestamp: serverTimestamp(),
+                time: new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Dhaka"})).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+            });
+
+            // Update parent conversation
+            await db.collection('conversations').doc(targetId).set({
+                lastMessage: text,
+                lastMessageTimestamp: Date.now(),
+                unread: false,
+                status: 'replied'
+            }, { merge: true });
+            
+            serverLog(`[History] Dashboard reply persisted for ${targetId}`);
+        } catch (historyError) {
+            serverLog(`[History Error]: ${historyError.message}`);
         }
 
         // Success log
