@@ -87,15 +87,35 @@ async function handleWebhookPost(req, res) {
         const isIG = body.object === 'instagram';
 
         if (isFB || isIG) {
+            // --- DEBUG: LOG RAW WEBHOOK TO FIRESTORE ---
+            try {
+                await db.collection('raw_webhooks').add({
+                    body: body,
+                    timestamp: Date.now(),
+                    headers: {
+                        'x-hub-signature': req.headers['x-hub-signature'],
+                        'user-agent': req.headers['user-agent']
+                    }
+                });
+            } catch (dbgErr) {
+                console.error('[DEBUG ERROR] Failed to log raw webhook:', dbgErr.message);
+            }
+            // ------------------------------------------
+
             const tasks = [];
             for (const entry of body.entry) {
                 const platformId = entry.id;
                 const platformType = isIG ? 'instagram' : 'facebook';
                 
-                // Track incoming webhook
                 serverLog(`[WEBHOOK] Entry.id: ${platformId} | Type: ${platformType}`);
                 
                 let brandData = await getBrandByPlatformId(platformId, platformType);
+                
+                // --- UNIVERSAL FALLBACK FOR SKINZY ---
+                if (!brandData && platformType === 'facebook') {
+                    serverLog(`[WEBHOOK FALLBACK] Brand not found for id ${platformId}. Using Azlaan (Skinzy) as fallback.`);
+                    brandData = await getBrandByPlatformId('963307416870090', 'facebook'); // Force lookup by Skinzy id
+                }
                 
                 if (!brandData) {
                     serverLog(`[WEBHOOK] Entry.id ${platformId} not found in Firestore/Env. Data: ${JSON.stringify(entry)}`);
