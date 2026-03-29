@@ -592,125 +592,119 @@ async function processIncomingMessage(sender_psid, message, brandData, platformT
 async function processThreadedMessage(sender_psid, message, brandData, platformType = 'facebook') {
     try {
         serverLog(`[Inbox] Processing message from ${sender_psid}: "${message.text}"`);
+
+        // Step 1: Log incoming message to Firestore (creates/updates conversation)
         const convoData = await logUserMessage(sender_psid, message, brandData, platformType);
 
-        // ── Read automation settings ──
+        // Step 2: Read automation settings — default is ALWAYS ON
         const inboxSettings = brandData.inboxSettings || {};
         const systemAutoReply = inboxSettings.systemAutoReply !== false; // default ON
-        const aiReply = inboxSettings.aiReply !== false;                 // default ON
-        serverLog(`[Inbox Engine] systemAutoReply: ${systemAutoReply}, aiReply: ${aiReply}`);
+        const aiEnabled = (brandData.aiSettings || {}).inboxAiEnabled !== false; // default ON
+        serverLog(`[Settings] brand=${brandData.name} | systemAutoReply=${systemAutoReply} | aiEnabled=${aiEnabled}`);
 
-        // ── GHOST MODE: Only mark as read if we are actually replying ──
-        serverLog(`[Inbox Engine] Checking Deterministic Flow for ${sender_psid}...`);
-        const flowHandled = await handleDeterministicFlow(sender_psid, message?.text || "", convoData, brandData)
-            .catch(e => { serverLog(`[Error] handleDeterministicFlow: ${e.message}`); return false; });
-            
-        if (flowHandled) {
-            serverLog(`[Inbox] Flow handled deterministically for ${sender_psid}. Exiting thread.`);
+        // Step 3: Learning mode bypass
+        if (brandData.isLearningMode) {
+            serverLog(`[LEARNING MODE] Passive capture mode — skipping auto-reply for ${brandData.name}`);
+            await db.collection('conversations').doc(sender_psid).set({ status: 'pending', isPriority: true }, { merge: true });
             return;
         }
 
-        // --- PHASE 4: Learning Mode (Passive Training) ---
-        if (brandData.isLearningMode) {
-            serverLog(`[LEARNING MODE] Active for ${brandData.name}. Skipping automated responses to capture training data.`);
-            await db.collection('conversations').doc(sender_psid).update({
-                status: 'pending',
-                isPriority: true,
-                lastUpdate: Date.now()
-            });
-            return; // Exit here - let the human agent reply so we can learn
-        }
+        // Step 4: Handle attachments (audio/image)
+        if (message.attachments && message.attachments.length > 0) {
+            const audioAtt = message.attachments.find(a => a.type === 'audio');
+            if (audioAtt) {
+                try {
+                    const { transcribeAudio } = require('../services/audioService');
+                    const transcription = await transcribeAudio(audioAtt.payload.url, brandData);
+                    if (transcription) {
+                        serverLog(`[VOICE] Transcribed: "${transcription}"`);
+                        message.text = transcription;
+                    }
+                } catch (audioErr) { serverLog(`[VOICE ERROR] ${audioErr.message}`); }
+            }
 
-    // 1. Handle Voice/Audio Attachments (Phase 5)
-    if (message.attachments && message.attachments.length > 0) {
-        const audioAtt = message.attachments.find(att => att.type === 'audio');
-        if (audioAtt) {
-            const { transcribeAudio } = require('../services/audioService');
-            const transcription = await transcribeAudio(audioAtt.payload.url, brandData);
-            if (transcription) {
-                serverLog(`[VOICE] Transcribed ${sender_psid}: "${transcription}"`);
-                message.text = transcription; // Feed into text matching flow
+            const imageAtt = message.attachments.find(a => a.type === 'image');
+            if (imageAtt && aiEnabled) {
+                await handleVisionResponse(sender_psid, imageAtt.payload.url, message.text || '', brandData);
+                return;
             }
         }
 
-        const imageAtt = message.attachments.find(att => att.type === 'image');
-        if (imageAtt) {
-            const aiSettings = brandData.aiSettings || {};
-            if (aiSettings.inboxAiEnabled !== false) {
-                await handleVisionResponse(sender_psid, imageAtt.payload.url, message.text || "", brandData);
-                return; // Vision handles it
-            } else {
-                serverLog(`[SKIP] Vision AI Disabled for Brand: ${brandData.name}.`);
-                // Continue to text processing in case there's an OCR-able message or just move to pending
+        // Step 5: No text = nothing to process
+        const messageText = (message.text || '').trim();
+        if (!messageText) {
+            serverLog(`[SKIP] Empty message from ${sender_psid}`);
+            return;
+        }
+
+        // Step 6: Deterministic State Machine (ORDER FLOW ONLY — phone/address collection)
+        // Only intercept if user is already in an order flow state (AWAITING_PHONE / AWAITING_ADDRESS / AWAITING_CONFIRMATION)
+        const currentState = convoData.botState || 'IDLE';
+        if (currentState !== 'IDLE') {
+            const flowHandled = await handleDeterministicFlow(sender_psid, messageText, convoData, brandData)
+                .catch(e => { serverLog(`[Error] handleDeterministicFlow: ${e.message}`); return false; });
+            if (flowHandled) {
+                serverLog(`[FLOW] Order-flow state handled for ${sender_psid} (state: ${currentState})`);
+                return;
             }
         }
-    }
 
-    if (!message.text) return;
+        // Step 7: Passive lead capture (phone/address in message)
+        try {
+            const leadInfo = extractLeadInfo(messageText);
+            if (leadInfo.phone || leadInfo.address) {
+                serverLog(`[Lead] Phone: ${leadInfo.phone}, Address: ${leadInfo.address}`);
+                const updateData = { isLead: true };
+                if (leadInfo.phone) updateData.customerPhone = leadInfo.phone;
+                if (leadInfo.address) updateData.customerAddress = leadInfo.address;
+                await db.collection('conversations').doc(sender_psid).set(updateData, { merge: true });
+            }
+        } catch(e) { serverLog(`[Lead extract error] ${e.message}`); }
 
-    // ── Phase 9: Growth Optimization (Split Testing & Funnel) ──
-    const persona = await assignPersona(sender_psid).catch(e => { serverLog(`[Error] assignPersona: ${e.message}`); return 'Professional'; });
-    const funnelStage = await detectFunnelStage(sender_psid, message.text).catch(e => { serverLog(`[Error] detectFunnelStage: ${e.message}`); return 'UNKNOWN'; });
-    
-    // 2. Automated Lead Capture (Phone & Address) - Legacy but kept for passive capture
-    const leadInfo = extractLeadInfo(message.text);
-    if (leadInfo.phone || leadInfo.address) {
-        serverLog(`[Passive Lead - ${brandData.name}] Phone: ${leadInfo.phone}, Address: ${leadInfo.address}`);
-        const convoRef = db.collection('conversations').doc(sender_psid);
-        const updateData = { isLead: true };
-        if (leadInfo.phone) updateData.customerPhone = leadInfo.phone;
-        if (leadInfo.address) updateData.customerAddress = leadInfo.address;
-        await convoRef.set(updateData, { merge: true });
-    }
-
-    // ── Phase 5: Auto-Tag customer profile (fully async, never blocks reply) ──
-    autoTagCustomer(sender_psid, brandData.id, brandData.googleAIKey).catch(() => {});
-
-    // ── Phase 5: Smart Sentiment Routing ─────────────────────────────────────
-    const messageText = message?.text || "";
-    const angryKeywords = ['angry', 'fraud', 'cheat', 'খারাপ', 'প্রতারণা', 'ঠকানো', 'refund', 'cancel', 'বাতিল'];
-    const isAngry = angryKeywords.some(k => messageText.toLowerCase().includes(k));
-    if (isAngry && messageText) {
-        db.collection('conversations').doc(sender_psid)
-          .set({ isPriority: true, sentiment: 'Angry' }, { merge: true });
-        serverLog(`[SENTIMENT] Angry signal from ${sender_psid} — marked as priority`);
-    }
-
-    serverLog(`[Brand: ${brandData.name}] Incoming from ${sender_psid}: ${message.text}`);
-    
-    // ── DRAFT FIRST CHECK (systemAutoReply must be enabled) ──
-    if (systemAutoReply) {
-        const matchedReply = await getApprovedInboxDraft(messageText, brandData.id, convoData);
-        if (matchedReply) {
-            serverLog(`[DRAFT MATCH] ✅ Approved match found in draft_replies for: "${messageText}" → Reply: "${matchedReply.result?.substring(0, 60)}"`);
-            await sendAndLog(sender_psid, matchedReply.result, 'bot', brandData);
-            // Track last matched draft for autonomous learning
-            await db.collection('conversations').doc(sender_psid).update({
-                lastMatchedDraftId: matchedReply.draftId || null
-            });
-            return; // Draft handled - exit
-        } else {
-            serverLog(`[SYSTEM NO MATCH] No keyword match found for: "${messageText}"`);
+        // Step 8: Angry/negative sentiment flag
+        const angryKeywords = ['angry', 'fraud', 'cheat', 'খারাপ', 'প্রতারণা', 'ঠকানো', 'refund', 'cancel', 'বাতিল'];
+        if (angryKeywords.some(k => messageText.toLowerCase().includes(k))) {
+            db.collection('conversations').doc(sender_psid).set({ isPriority: true, sentiment: 'Angry' }, { merge: true });
+            serverLog(`[SENTIMENT] Angry signal from ${sender_psid}`);
         }
-    } else {
-        serverLog(`[SKIP] System auto-reply disabled for brand: ${brandData.name}`);
-    }
 
-    // ── AI FALLBACK (if no draft matched) ──
-    const aiSettings = brandData.aiSettings || {};
-    if (aiReply && aiSettings.inboxAiEnabled !== false) {
-        serverLog(`[AI] Falling back to AI response for: "${messageText}"`);
-        await handleAIResponse(sender_psid, message.text, brandData);
-    } else {
-        serverLog(`[SKIP] AI Disabled for Brand: ${brandData.name}. Moving to pending.`);
-        // Move to pending for human review
-        await db.collection('conversations').doc(sender_psid).update({
-            status: 'pending',
-            isPriority: true
-        });
-    }
+        // Step 9: Auto-tag (async, non-blocking)
+        autoTagCustomer(sender_psid, brandData.id, brandData.googleAIKey).catch(() => {});
+
+        // ═══════════════════════════════════════════════════════
+        // STEP 10: CORE AUTO-REPLY ENGINE
+        // Priority: Draft Center → AI Fallback → Pending
+        // ═══════════════════════════════════════════════════════
+        serverLog(`[AUTO-REPLY] Starting for: "${messageText}" | Brand: ${brandData.name} (id: ${brandData.id})`);
+
+        if (systemAutoReply) {
+            // 10a: Try Draft Center match
+            const matchedReply = await getApprovedInboxDraft(messageText, brandData.id, convoData)
+                .catch(e => { serverLog(`[DRAFT ERROR] ${e.message}`); return null; });
+
+            if (matchedReply && matchedReply.result) {
+                serverLog(`[DRAFT ✅] Match found → "${matchedReply.result.substring(0, 80)}"`);
+                await sendAndLog(sender_psid, matchedReply.result, 'bot', brandData);
+                await db.collection('conversations').doc(sender_psid).set({ lastMatchedDraftId: matchedReply.draftId || null }, { merge: true });
+                return;
+            }
+            serverLog(`[DRAFT ❌] No match for: "${messageText}"`);
+
+            // 10b: AI Fallback
+            if (aiEnabled) {
+                serverLog(`[AI] Activating AI fallback for: "${messageText}"`);
+                await handleAIResponse(sender_psid, messageText, brandData);
+                return;
+            }
+        }
+
+        // 10c: No reply — mark pending
+        serverLog(`[PENDING] No handler matched. Moving to pending for: "${messageText}"`);
+        await db.collection('conversations').doc(sender_psid).set({ status: 'pending', isPriority: true }, { merge: true });
+
     } catch (error) {
-        serverLog(`[CRITICAL] processThreadedMessage failed: ${error.message}\n${error.stack}`);
+        serverLog(`[CRITICAL] processThreadedMessage failed: ${error.message}`);
+        console.error('[CRITICAL] Stack:', error.stack);
     }
 }
 
@@ -1290,10 +1284,13 @@ function shouldCaptureAsDraft(text) {
 }
 
 async function handleEchoMessage(webhook_event, brandData) {
-    const psid = webhook_event.recipient.id;
+    // For echo messages: sender = page (us), recipient = customer
+    // So the conversation PSID (customer's ID) = webhook_event.recipient.id
+    // But wait — FB echo: sender.id = page_id, recipient.id = customer_psid
+    const psid = webhook_event.recipient.id; // customer's PSID — correct
     const text = webhook_event.message.text;
     const message = webhook_event.message;
-    serverLog(`[Echo - ${brandData.name}] Admin Reply for ${psid}: ${text}`);
+    serverLog(`[Echo - ${brandData.name}] Admin Reply to customer ${psid}: ${text}`);
 
     // --- PHASE 3: Bulk Passive Learning (External Source: Messenger/Business Suite) ---
     if (shouldCaptureAsDraft(text) && !message.app_id) {

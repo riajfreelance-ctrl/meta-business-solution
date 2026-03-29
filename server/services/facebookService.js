@@ -6,7 +6,7 @@ const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
 async function getProfile(psid, accessToken) {
     try {
         const token = accessToken || PAGE_ACCESS_TOKEN;
-        const resp = await axios.get(`https://graph.facebook.com/${psid}?fields=first_name,last_name,profile_pic&access_token=${token}`);
+        const resp = await axios.get(`https://graph.facebook.com/v21.0/${psid}?fields=first_name,last_name,profile_pic&access_token=${token}`);
         return resp.data;
     } catch (e) {
         console.error('FB Profile Error:', e.message);
@@ -34,7 +34,7 @@ async function sendMessage(psid, response, accessToken, replyToId = null) {
 async function replyToComment(commentId, message, accessToken) {
     const token = accessToken || PAGE_ACCESS_TOKEN;
     try {
-        await axios.post(`https://graph.facebook.com/v12.0/${commentId}/comments?access_token=${token}`, {
+        await axios.post(`https://graph.facebook.com/v21.0/${commentId}/comments?access_token=${token}`, {
             message: message
         });
         serverLog(`Replied to comment ${commentId}`);
@@ -46,7 +46,7 @@ async function replyToComment(commentId, message, accessToken) {
 async function sendPrivateReply(commentId, message, accessToken) {
     const token = accessToken || PAGE_ACCESS_TOKEN;
     try {
-        await axios.post(`https://graph.facebook.com/v12.0/${commentId}/private_replies?access_token=${token}`, {
+        await axios.post(`https://graph.facebook.com/v21.0/${commentId}/private_replies?access_token=${token}`, {
             message: message
         });
         serverLog(`Sent private reply to comment ${commentId}`);
@@ -69,7 +69,7 @@ async function getPostContent(postId, accessToken) {
 async function likeComment(commentId, accessToken) {
     const token = accessToken || PAGE_ACCESS_TOKEN;
     try {
-        await axios.post(`https://graph.facebook.com/v12.0/${commentId}/likes?access_token=${token}`);
+        await axios.post(`https://graph.facebook.com/v21.0/${commentId}/likes?access_token=${token}`);
         serverLog(`Liked comment ${commentId}`);
     } catch (e) {
         serverLog(`Like error: ${e.response?.data?.error?.message || e.message}`);
@@ -79,7 +79,7 @@ async function likeComment(commentId, accessToken) {
 async function hideComment(commentId, accessToken) {
     const token = accessToken || PAGE_ACCESS_TOKEN;
     try {
-        await axios.post(`https://graph.facebook.com/v12.0/${commentId}?access_token=${token}`, {
+        await axios.post(`https://graph.facebook.com/v21.0/${commentId}?access_token=${token}`, {
             is_hidden: true
         });
         serverLog(`Hid comment ${commentId}`);
@@ -107,7 +107,7 @@ async function getLatestPosts(pageToken, limit = 100) {
 async function sendButtonTemplate(psid, text, button, accessToken) {
     const token = accessToken || PAGE_ACCESS_TOKEN;
     try {
-        await axios.post(`https://graph.facebook.com/v12.0/me/messages?access_token=${token}`, {
+        await axios.post(`https://graph.facebook.com/v21.0/me/messages?access_token=${token}`, {
             recipient: { id: psid },
             message: {
                 attachment: {
@@ -136,10 +136,10 @@ async function markRead(psid, accessToken) {
     const token = accessToken || PAGE_ACCESS_TOKEN;
     const body = {
         recipient: { id: psid },
-        sender_action: "mark_read"
+        sender_action: "MARK_SEEN"
     };
     try {
-        await axios.post(`https://graph.facebook.com/v12.0/me/messages?access_token=${token}`, body);
+        await axios.post(`https://graph.facebook.com/v21.0/me/messages?access_token=${token}`, body);
     } catch (e) {
         serverLog(`Mark read error: ${e.response?.data?.error?.message || e.message}`);
     }
@@ -162,7 +162,7 @@ async function sendCarouselMessage(psid, elements, accessToken) {
         }
     };
     try {
-        await axios.post(`https://graph.facebook.com/v12.0/me/messages?access_token=${token}`, body);
+        await axios.post(`https://graph.facebook.com/v21.0/me/messages?access_token=${token}`, body);
         serverLog(`[Phase 3] Sent carousel to ${psid}`);
     } catch (e) {
         serverLog(`[Phase 3] Carousel error: ${e.response?.data?.error?.message || e.message}`);
@@ -184,7 +184,7 @@ async function sendMediaMessage(psid, mediaUrl, mediaType = 'image', accessToken
         }
     };
     try {
-        await axios.post(`https://graph.facebook.com/v12.0/me/messages?access_token=${token}`, body);
+        await axios.post(`https://graph.facebook.com/v21.0/me/messages?access_token=${token}`, body);
         serverLog(`[Phase 3] Sent ${mediaType} to ${psid}`);
     } catch (e) {
         serverLog(`[Phase 3] Media send error: ${e.response?.data?.error?.message || e.message}`);

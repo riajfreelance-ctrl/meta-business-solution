@@ -72,6 +72,22 @@ async function getBrandByPlatformId(platformId, type = 'facebook') {
         fbPageToken: process.env.PAGE_ACCESS_TOKEN || process.env.FB_PAGE_TOKEN,
         googleAIKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY,
         waAccessToken: process.env.WA_ACCESS_TOKEN || process.env.WA_PAGE_TOKEN,
+        // Automation settings — all ON by default for owner brand
+        inboxSettings: {
+          systemAutoReply: true,
+          aiReply: true,
+          humanHandoff: false
+        },
+        aiSettings: {
+          inboxAiEnabled: true
+        },
+        commentSettings: {
+          systemAutoReply: true,
+          aiReply: true,
+          autoLike: false,
+          spamFilter: false,
+          humanHandoff: false
+        },
         isDevFallback: true
       };
     }
