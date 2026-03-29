@@ -8,8 +8,9 @@ require('dotenv').config();
 const serviceAccountPath = path.join(process.cwd(), 'server', 'firebase-service-account.json');
 let serviceAccount;
 try {
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  const envKey = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON || process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (envKey) {
+    serviceAccount = typeof envKey === 'string' ? JSON.parse(envKey) : envKey;
     // Fix for private key newlines in Vercel env vars
     if (serviceAccount.private_key) {
       serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
