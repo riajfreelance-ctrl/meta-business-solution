@@ -8,7 +8,9 @@ require('dotenv').config();
 const serviceAccountPath = path.join(process.cwd(), 'server', 'firebase-service-account.json');
 let serviceAccount;
 try {
-  if (fs.existsSync(serviceAccountPath)) {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  } else if (fs.existsSync(serviceAccountPath)) {
     serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
   } else {
     // Relative fallback
