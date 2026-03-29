@@ -114,7 +114,7 @@ async function processIncomingWAMessage(wa_id, text, brandData, messageId, image
         await db.collection('conversations').doc(wa_id).update({
             status: 'pending',
             isPriority: true,
-            lastUpdate: Date.now()
+            lastUpdate: serverTimestamp()
         });
         return; 
     }
@@ -337,8 +337,26 @@ async function sendWAMessage(wa_id, text, brandData, messageId) {
             ).catch(err => serverLog(`[WA Read Receipt Error]: ${err.message}`));
         }
         
+        const now = new Date();
+        const dhakaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Dhaka"}));
+        const timeStr = dhakaTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+
         // Log outgoing and clear unread flag
-        await db.collection('conversations').doc(wa_id).update({ unread: false });
+        await db.collection('conversations').doc(wa_id).update({ 
+            lastMessage: text,
+            lastUpdate: serverTimestamp(),
+            unread: false 
+        });
+
+        // --- NEW: Log to conversation history for Inbox visibility ---
+        await db.collection(`conversations/${wa_id}/messages`).add({
+            text,
+            type: 'sent',
+            brandId: brandData.id,
+            platform: 'whatsapp',
+            timestamp: serverTimestamp(),
+            time: timeStr
+        });
 
         // EXPERT CAPTURE: If an agent sends a manual message, save it as a potential draft
         if (shouldCaptureAsDraft(text) && !messageId) {
@@ -370,7 +388,7 @@ async function sendWAMessage(wa_id, text, brandData, messageId) {
             type: 'bot', 
             platform: 'whatsapp',
             brandId: brandData.id,
-            timestamp: Date.now() 
+            timestamp: serverTimestamp() 
         });
     } catch (error) {
         serverLog("WA SEND ERROR: " + (error.response?.data?.error?.message || error.message));
@@ -595,7 +613,7 @@ async function handleWAVisionResponse(wa_id, imageUrl, text, brandData) {
             await db.collection('conversations').doc(wa_id).update({
                 status: 'pending',
                 isPriority: true,
-                lastUpdate: Date.now()
+                lastUpdate: serverTimestamp()
             });
             return;
         }

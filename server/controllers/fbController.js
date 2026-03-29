@@ -95,18 +95,29 @@ async function handleWebhookPost(req, res) {
                 // Track incoming webhook
                 serverLog(`[WEBHOOK] Entry.id: ${platformId} | Type: ${platformType}`);
                 
-                const brandData = await getBrandByPlatformId(platformId, platformType);
+                let brandData = await getBrandByPlatformId(platformId, platformType);
                 
                 if (!brandData) {
-                    serverLog(`[WEBHOOK ERROR] Brand not found for PageID: ${platformId}`);
-                    continue;
+                    serverLog(`[WEBHOOK] Entry.id ${platformId} not found, checking messaging events...`);
+                } else {
+                    serverLog(`[WEBHOOK SUCCESS] Matched Brand: ${brandData.name} (${brandData.id})`);
                 }
-                serverLog(`[WEBHOOK SUCCESS] Matched Brand: ${brandData.name} (${brandData.id})`);
 
                 if (entry.messaging) {
                     for (const webhook_event of entry.messaging) {
                         const sender_psid = webhook_event.sender.id;
                         webhook_event.platform = platformType;
+
+                        // Fallback brand identification for messages
+                        if (!brandData && webhook_event.recipient?.id) {
+                            brandData = await getBrandByPlatformId(webhook_event.recipient.id, platformType);
+                            if (brandData) serverLog(`[WEBHOOK SUCCESS] Matched Brand from recipient ID: ${brandData.name}`);
+                        }
+
+                        if (!brandData) {
+                            serverLog(`[WEBHOOK ERROR] Could not identify brand for recipient: ${webhook_event.recipient?.id}`);
+                            continue;
+                        }
 
                         if (webhook_event.message) {
                             if (webhook_event.message.is_echo) {
@@ -124,7 +135,13 @@ async function handleWebhookPost(req, res) {
 
                 if (entry.changes) {
                     for (const change of entry.changes) {
-                        if (change.field === 'feed' && change.value.item === 'comment' && change.value.verb === 'add') {
+                        // Fallback brand identification for comments
+                        if (!brandData) {
+                             // For comments, we might need a different lookup if platformId fails
+                             // but usually entry.id is the page id
+                        }
+                        
+                        if (brandData && change.field === 'feed' && change.value.item === 'comment' && change.value.verb === 'add') {
                             tasks.push(processIncomingComment(change.value, brandData));
                         }
                     }
@@ -306,22 +323,55 @@ async function getShuffledReply(message, brandId, postId = null) {
     const snapshot = await db.collection("comment_drafts").where("brandId", "==", brandId).get();
     const drafts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    // 1. Try to find local match (Specific Post ID)
+    if (drafts.length === 0) return null;
+
+    // 1. Try to find local match (Specific Post ID) with Fuzzy Support
     if (postId) {
-        const postSpecificMatch = drafts.find(draft => 
-            draft.postId === postId && 
-            draft.keywords.some(kw => message.toLowerCase().includes(kw.toLowerCase()))
-        );
-        if (postSpecificMatch && postSpecificMatch.variations?.length > 0) {
-            const index = Math.floor(Math.random() * postSpecificMatch.variations.length);
-            return { variation: postSpecificMatch.variations[index], draftId: postSpecificMatch.id, index };
+        const postSpecificDrafts = drafts.filter(draft => draft.postId === postId);
+        if (postSpecificDrafts.length > 0) {
+            const postRecords = [];
+            postSpecificDrafts.forEach(draft => {
+                (draft.keywords || []).forEach(kw => postRecords.push({ phrase: kw, draft }));
+            });
+            const postFuse = new Fuse(postRecords, { keys: ['phrase'], threshold: 0.35 });
+            const postResults = postFuse.search(message);
+            
+            if (postResults.length > 0 && postResults[0].score <= 0.35) {
+                const bestMatch = postResults[0].item.draft;
+                const index = Math.floor(Math.random() * bestMatch.variations.length);
+                serverLog(`[Comment] Post-specific match found for: ${message}`);
+                return { variation: bestMatch.variations[index], draftId: bestMatch.id, index };
+            }
         }
     }
 
-    // 2. Fallback to Global match (No Post ID)
+    // 2. Fuzzy Matching for Comments (Global Rules)
+    const searchableRecords = [];
+    drafts.forEach(draft => {
+        if (draft.postId && draft.postId !== postId) return; // Skip post-specific ones for other posts
+        (draft.keywords || []).forEach(kw => {
+            searchableRecords.push({ phrase: kw, draft: draft });
+        });
+    });
+
+    if (searchableRecords.length > 0) {
+        const fuse = new Fuse(searchableRecords, {
+            keys: ['phrase'],
+            threshold: 0.35,
+            includeScore: true
+        });
+        const results = fuse.search(message);
+        if (results.length > 0 && results[0].score <= 0.35) {
+            const bestMatch = results[0].item.draft;
+            const index = Math.floor(Math.random() * bestMatch.variations.length);
+            return { variation: bestMatch.variations[index], draftId: bestMatch.id, index };
+        }
+    }
+
+    // 3. Last Resort: Simple Fallback match
     for (const draft of drafts) {
-        if (draft.postId) continue; // Skip post-specific ones in global search
-        const match = draft.keywords.some(kw => message.toLowerCase().includes(kw.toLowerCase()));
+        if (draft.postId) continue; 
+        const match = (draft.keywords || []).some(kw => message.toLowerCase().includes(kw.toLowerCase()));
         if (match && draft.variations?.length > 0) {
             const index = Math.floor(Math.random() * draft.variations.length);
             return { variation: draft.variations[index], draftId: draft.id, index };
@@ -338,14 +388,17 @@ async function getApprovedInboxDraft(message, brandId, convoData) {
     const [draftSnap, kbSnap] = await Promise.all([
         db.collection("draft_replies")
             .where("brandId", "==", brandId)
-            .where("status", "==", "approved")
+            // Removed strict "approved" filter to discover manual entries with no status
             .get(),
         db.collection("knowledge_base")
             .where("brandId", "==", brandId)
             .get()
     ]);
     
-    const drafts = draftSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Filter Drafts in memory: status is missing OR status == 'approved'
+    const drafts = draftSnap.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(d => !d.status || d.status === 'approved');
     const kbRules = kbSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
     // 2. Normalize and Flatten data for Fuse.js
@@ -416,7 +469,7 @@ async function getApprovedInboxDraft(message, brandId, convoData) {
         });
 
         const bestMatch = results[0];
-        if (bestMatch.score <= 0.35) {
+        if (bestMatch.score <= 0.38) { // Slightly increased threshold for robustness
             let resultText = bestMatch.item.result;
             
             const sentiment = convoData?.sentiment || 'Neutral';
@@ -431,16 +484,26 @@ async function getApprovedInboxDraft(message, brandId, convoData) {
             }
             
             serverLog(`[Unified Match] Score: ${bestMatch.score.toFixed(3)} | Type: ${bestMatch.item.type} | Input: ${lowerText} | Match: ${bestMatch.item.phrase}`);
-            return { text: resultText, result: resultText, draftId: bestMatch.item.ruleId || bestMatch.item.draftId };
+            return { text: resultText, result: resultText, draftId: (bestMatch.item.ruleId || bestMatch.item.draftId) };
         }
     }
 
-    // 4. Intent Fallback (e.g. Price detection if fuzzy fails)
+    // 4. Intent Fallback + Simple Keyword Includes (Robustness Phase)
     const basicIntent = detectBasicIntent(message);
     if (basicIntent.intent !== 'UNKNOWN') {
         const intentKeyword = basicIntent.intent.replace('ASK_', '').charAt(0).toUpperCase() + basicIntent.intent.replace('ASK_', '').toLowerCase().slice(1);
         
-        // Check KB first for Intent
+        // Search by keyword inclusion as absolute fallback
+        const includesMatch = searchableRecords.find(r => 
+            lowerText.includes(r.phrase.toLowerCase()) || 
+            (r.phrase.length > 3 && lowerText.includes(normalizePhonetic(r.phrase)))
+        );
+        if (includesMatch) {
+             serverLog(`[Keyword Fallback] Matched: ${includesMatch.phrase}`);
+             return { text: includesMatch.result, result: includesMatch.result, draftId: (includesMatch.ruleId || includesMatch.draftId) };
+        }
+        
+        // Check KB for Intent
         const intentMatch = kbRules.find(r => r.keywords?.some(kw => kw.toLowerCase() === intentKeyword.toLowerCase()));
         if (intentMatch) return { text: intentMatch.answer, result: intentMatch.answer, draftId: intentMatch.id };
         
@@ -603,12 +666,7 @@ async function processThreadedMessage(sender_psid, message, brandData, platformT
     }
 
     serverLog(`[Brand: ${brandData.name}] Incoming from ${sender_psid}: ${message.text}`);
-    // The `snapshot` variable is not defined here. Assuming it was meant to be part of a previous logic.
-    // Removing the `if (!snapshot.empty)` block as it would cause an error.
-    // if (!snapshot.empty) {
-    //     const answer = snapshot.docs[0].data().answer;
-    //     await sendAndLog(sender_psid, answer, 'bot', brandData);
-    // } else {
+    
     // ── DRAFT FIRST CHECK ──
     const matchedReply = await getApprovedInboxDraft(messageText, brandData.id, convoData);
         if (matchedReply) {
@@ -922,8 +980,12 @@ async function sendAndLog(psid, text, type, brandData) {
             text, 
             type, 
             brandId: brandData.id,
-            timestamp: Date.now() 
+            timestamp: serverTimestamp() 
         });
+
+        const now = new Date();
+        const dhakaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Dhaka"}));
+        const timeStr = dhakaTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
         // --- NEW: Log to conversation history for Inbox visibility ---
         await db.collection('conversations').doc(psid).collection('messages').add({
@@ -1512,6 +1574,10 @@ async function sendMessageFromDashboard(req, res) {
 
         // --- NEW: Persist Dashboard Reply in History ---
         try {
+            const now = new Date();
+            const dhakaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Dhaka"}));
+            const timeStr = dhakaTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+
             await db.collection(`conversations/${targetId}/messages`).add({
                 text: text || '',
                 type: 'sent',
@@ -1519,13 +1585,13 @@ async function sendMessageFromDashboard(req, res) {
                 brandId: brandData.id,
                 platform: 'facebook',
                 timestamp: serverTimestamp(),
-                time: new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true })
+                time: timeStr
             });
 
             // Update parent conversation
             await db.collection('conversations').doc(targetId).set({
                 lastMessage: text,
-                lastMessageTimestamp: Date.now(),
+                lastMessageTimestamp: serverTimestamp(),
                 unread: false,
                 status: 'replied'
             }, { merge: true });

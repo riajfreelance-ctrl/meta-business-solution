@@ -75,6 +75,7 @@ const DraftCenter = ({
         variations: [],
         approvedVariations: [],
         brandId: activeBrandId,
+        status: 'approved', // Default to active for manual entries
         timestamp: new Date()
       });
       setIsAddingDraft(false);

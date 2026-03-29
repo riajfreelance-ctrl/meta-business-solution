@@ -167,6 +167,7 @@ const CommentDraftCenter = ({ isDarkMode, t, commentDrafts = [], pendingComments
         variations: form.variations,
         brandId: activeBrandId,
         postId: form.selectedPostId || null,
+        status: 'approved', // Default to active for manual entries
         timestamp: new Date()
       });
       if (form.originPendingId) await deleteDoc(doc(db, "pending_comments", form.originPendingId));
