@@ -1,4 +1,4 @@
-const { db, getBrandByPlatformId, serverTimestamp } = require('../services/firestoreService');
+const { admin, db, getBrandByPlatformId, serverTimestamp, FieldValue } = require('../services/firestoreService');
 const { getProfile, sendMessage, replyToComment, sendPrivateReply, getPostContent, likeComment, hideComment, sendCarouselMessage, sendSequencedMedia } = require('../services/facebookService');
 const { getDynamicModel, getDynamicVisionModel } = require('../services/geminiService');
 const { getLinguisticVariations, normalizePhonetic, cleanNoise } = require('../utils/linguisticEngine');
@@ -98,9 +98,9 @@ async function handleWebhookPost(req, res) {
                 let brandData = await getBrandByPlatformId(platformId, platformType);
                 
                 if (!brandData) {
-                    serverLog(`[WEBHOOK] Entry.id ${platformId} not found, checking messaging events...`);
+                    serverLog(`[WEBHOOK] Entry.id ${platformId} not found in Firestore/Env. Data: ${JSON.stringify(entry)}`);
                 } else {
-                    serverLog(`[WEBHOOK SUCCESS] Matched Brand: ${brandData.name} (FB ID: ${brandData.facebookPageId})`);
+                    serverLog(`[WEBHOOK SUCCESS] Matched Brand: ${brandData.name} (ID: ${brandData.id}) for Entry.id: ${platformId}`);
                 }
 
                 if (entry.messaging) {
@@ -111,7 +111,7 @@ async function handleWebhookPost(req, res) {
                         // Fallback brand identification for messages
                         if (!brandData && webhook_event.recipient?.id) {
                             brandData = await getBrandByPlatformId(webhook_event.recipient.id, platformType);
-                            if (brandData) serverLog(`[WEBHOOK SUCCESS] Matched Brand from recipient ID: ${brandData.name}`);
+                            if (brandData) serverLog(`[WEBHOOK SUCCESS] Matched Brand from recipient ID fallback: ${brandData.name}`);
                         }
 
                         if (!brandData) {
@@ -581,6 +581,8 @@ async function processIncomingMessage(sender_psid, message, brandData, platformT
 
     if (!message.text && (!message.attachments || message.attachments.length === 0)) return;
 
+    serverLog(`[INCOMING] New message from ${sender_psid} for brand: ${brandData.name}`);
+
     // Direct synchronous jump, avoiding `setTimeout` which is killed by Vercel serverless containers
     await processThreadedMessage(sender_psid, message, brandData, platformType).catch(e => {
         serverLog(`[ProcessError] ${e.message}`);
@@ -590,7 +592,13 @@ async function processIncomingMessage(sender_psid, message, brandData, platformT
 async function processThreadedMessage(sender_psid, message, brandData, platformType = 'facebook') {
     try {
         serverLog(`[Inbox] Processing message from ${sender_psid}: "${message.text}"`);
-    const convoData = await logUserMessage(sender_psid, message, brandData, platformType);
+        const convoData = await logUserMessage(sender_psid, message, brandData, platformType);
+
+        // ── Read automation settings ──
+        const inboxSettings = brandData.inboxSettings || {};
+        const systemAutoReply = inboxSettings.systemAutoReply !== false; // default ON
+        const aiReply = inboxSettings.aiReply !== false;                 // default ON
+        serverLog(`[Inbox Engine] systemAutoReply: ${systemAutoReply}, aiReply: ${aiReply}`);
 
         // ── GHOST MODE: Only mark as read if we are actually replying ──
         serverLog(`[Inbox Engine] Checking Deterministic Flow for ${sender_psid}...`);
@@ -598,7 +606,7 @@ async function processThreadedMessage(sender_psid, message, brandData, platformT
             .catch(e => { serverLog(`[Error] handleDeterministicFlow: ${e.message}`); return false; });
             
         if (flowHandled) {
-            serverLog(`[Inbox] Flow handled for ${sender_psid}`);
+            serverLog(`[Inbox] Flow handled deterministically for ${sender_psid}. Exiting thread.`);
             return;
         }
 
@@ -670,30 +678,37 @@ async function processThreadedMessage(sender_psid, message, brandData, platformT
 
     serverLog(`[Brand: ${brandData.name}] Incoming from ${sender_psid}: ${message.text}`);
     
-    // ── DRAFT FIRST CHECK ──
-    const matchedReply = await getApprovedInboxDraft(messageText, brandData.id, convoData);
+    // ── DRAFT FIRST CHECK (systemAutoReply must be enabled) ──
+    if (systemAutoReply) {
+        const matchedReply = await getApprovedInboxDraft(messageText, brandData.id, convoData);
         if (matchedReply) {
-            serverLog(`[DRAFT MATCH] Approved match found in draft_replies for: ${messageText}`);
+            serverLog(`[DRAFT MATCH] ✅ Approved match found in draft_replies for: "${messageText}" → Reply: "${matchedReply.result?.substring(0, 60)}"`);
             await sendAndLog(sender_psid, matchedReply.result, 'bot', brandData);
             // Track last matched draft for autonomous learning
             await db.collection('conversations').doc(sender_psid).update({
                 lastMatchedDraftId: matchedReply.draftId || null
             });
+            return; // Draft handled - exit
         } else {
-            serverLog(`[SYSTEM NO MATCH] No keyword match found for: ${messageText}`);
-            // Check if Generative AI is enabled for this brand
-            const aiSettings = brandData.aiSettings || {};
-            if (aiSettings.inboxAiEnabled !== false) {
-                await handleAIResponse(sender_psid, message.text, brandData);
-            } else {
-                serverLog(`[SKIP] AI Disabled for Brand: ${brandData.name}. No draft match.`);
-                // Move to pending for human review
-                await db.collection('conversations').doc(sender_psid).update({
-                    status: 'pending',
-                    isPriority: true
-                });
-            }
+            serverLog(`[SYSTEM NO MATCH] No keyword match found for: "${messageText}"`);
         }
+    } else {
+        serverLog(`[SKIP] System auto-reply disabled for brand: ${brandData.name}`);
+    }
+
+    // ── AI FALLBACK (if no draft matched) ──
+    const aiSettings = brandData.aiSettings || {};
+    if (aiReply && aiSettings.inboxAiEnabled !== false) {
+        serverLog(`[AI] Falling back to AI response for: "${messageText}"`);
+        await handleAIResponse(sender_psid, message.text, brandData);
+    } else {
+        serverLog(`[SKIP] AI Disabled for Brand: ${brandData.name}. Moving to pending.`);
+        // Move to pending for human review
+        await db.collection('conversations').doc(sender_psid).update({
+            status: 'pending',
+            isPriority: true
+        });
+    }
     } catch (error) {
         serverLog(`[CRITICAL] processThreadedMessage failed: ${error.message}\n${error.stack}`);
     }
@@ -784,7 +799,7 @@ async function handleAIResponse(sender_psid, text, brandData) {
                 status: 'pending',
                 type: 'auto_learned',
                 brandId: brandData.id,
-                timestamp: admin.firestore.FieldValue.serverTimestamp(),
+                timestamp: serverTimestamp(),
                 successCount: 0
             });
             serverLog(`[Auto-Learn] Capturing AI suggestion (Hyper-Index: ${brandData.autoHyperIndex !== false})`);
@@ -979,38 +994,39 @@ async function sendAndLog(psid, text, type, brandData) {
             serverLog(`[Send ERROR] Failed to send message to ${psid}: ${error.response?.data?.error?.message || error.message}`);
         }
         
+        const nowMs = Date.now();
+        const dhakaTime = new Date(nowMs);
+        const timeStr = dhakaTime.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true });
+
         // Log to global logs
         await db.collection('logs').add({ 
             sender_psid: psid, 
             text, 
             type, 
             brandId: brandData.id,
-            timestamp: serverTimestamp() 
+            timestamp: nowMs
         });
 
-        const now = new Date();
-        const dhakaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Dhaka"}));
-        const timeStr = dhakaTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-
-        // --- NEW: Log to conversation history for Inbox visibility ---
+        // Log to conversation history for Inbox visibility
         await db.collection('conversations').doc(psid).collection('messages').add({
             text,
             type: 'sent',
             sender_id: brandData.facebookPageId,
-            timestamp: Date.now()
+            brandId: brandData.id,
+            platform: 'facebook',
+            timestamp: nowMs,
+            time: timeStr
         });
 
-        // Update conversation summary
+        // Update conversation summary — timestamp as number so Firestore orderBy('timestamp','desc') sorts correctly
         await db.collection('conversations').doc(psid).set({
             lastMessage: text,
-            lastMessageTimestamp: Date.now(),
+            lastMessageTimestamp: nowMs,
+            timestamp: nowMs,          // keep in sync so InboxList sees it at top
             unread: false,
             platform: 'facebook',
             brandId: brandData.id
         }, { merge: true });
-
-        // Clear unread flag in conversation
-        await db.collection('conversations').doc(psid).update({ unread: false });
     } catch (e) {
         serverLog(`SendAndLog Error: ${e.message}`);
     }
@@ -1086,6 +1102,7 @@ async function logUserMessage(psid, message, brandData, platformType = 'facebook
     const currentData = doc.exists ? doc.data() : {};
     serverLog(`[LogMsg] Convo state: ${currentData.botState || 'IDLE'}`);
 
+    const nowMs = Date.now();
     const updateData = {
         id: psid,
         brandId: brandData.id,
@@ -1093,7 +1110,9 @@ async function logUserMessage(psid, message, brandData, platformType = 'facebook
         name: `${profile.first_name || ''} ${profile.last_name || ''}`,
         profilePic: profile.profile_pic || '',
         lastMessage: message.text || '',
-        timestamp: serverTimestamp(),
+        // Use numeric timestamp for consistent sorting (largest = newest = top of inbox)
+        timestamp: nowMs,
+        lastMessageTimestamp: nowMs,
         unread: true
     };
 
@@ -1106,8 +1125,7 @@ async function logUserMessage(psid, message, brandData, platformType = 'facebook
         type: 'received',
         brandId: brandData.id,
         platform: platformType,
-        platform: platformType,
-        timestamp: serverTimestamp(),
+        timestamp: nowMs,
         time: new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true })
     });
 
@@ -1133,12 +1151,12 @@ async function linkConversationsByPhone(convoId, phone, brandId) {
         if (otherIds.length > 0) {
             serverLog(`[Linking] Convo ${convoId} linked to ${otherIds.join(', ')} via phone ${phone}`);
             await db.collection('conversations').doc(convoId).update({
-                linkedConvos: admin.firestore.FieldValue.arrayUnion(...otherIds)
+                linkedConvos: FieldValue.arrayUnion(...otherIds)
             });
             // Update the others too
             for (const otherId of otherIds) {
                 await db.collection('conversations').doc(otherId).update({
-                    linkedConvos: admin.firestore.FieldValue.arrayUnion(convoId)
+                    linkedConvos: FieldValue.arrayUnion(convoId)
                 });
             }
         }
@@ -1216,7 +1234,7 @@ async function handleDeterministicFlow(psid, text, convoData, brandData) {
             if (lastDraftId) {
                 serverLog(`[Learning] Incrementing successCount for Draft: ${lastDraftId}`);
                 await db.collection('draft_replies').doc(lastDraftId).update({
-                    successCount: admin.firestore.FieldValue.increment(1)
+                    successCount: FieldValue.increment(1)
                 });
             }
 
@@ -1341,22 +1359,24 @@ async function handleEchoMessage(webhook_event, brandData) {
         }
     }
 
-    // --- NEW: Persist External Echo Reply in History ---
+    // --- Persist External Echo Reply in History (consistent numeric timestamp) ---
     try {
+        const echoNowMs = Date.now();
         await db.collection(`conversations/${psid}/messages`).add({
             text: text || '',
             type: 'sent',
             sender_id: brandData.facebookPageId,
             brandId: brandData.id,
             platform: 'facebook',
-            timestamp: serverTimestamp(),
-            time: new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true })
+            timestamp: echoNowMs,
+            time: new Date(echoNowMs).toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true })
         });
 
-        // Update parent conversation
+        // Update parent conversation — numeric timestamp keeps inbox sort order correct
         await db.collection('conversations').doc(psid).set({
             lastMessage: text,
-            lastMessageTimestamp: Date.now(),
+            lastMessageTimestamp: echoNowMs,
+            timestamp: echoNowMs,
             unread: false,
             status: 'replied'
         }, { merge: true });
@@ -1402,8 +1422,8 @@ async function syncConversationHistory(req, res) {
         
         if (!token) return res.status(400).json({ error: "FB Page Token missing" });
 
-        // 1. Fetch Conversations from Graph API
-        const convosResp = await axios.get(`https://graph.facebook.com/v12.0/me/conversations?fields=unread_count,updated_time,participants,messages.limit(1){message,from,timestamp}&access_token=${token}`);
+        // 1. Fetch Conversations from Graph API (v21.0)
+        const convosResp = await axios.get(`https://graph.facebook.com/v21.0/me/conversations?fields=unread_count,updated_time,participants,messages.limit(1){message,from,timestamp}&access_token=${token}`);
         
         const convos = convosResp.data.data;
         let count = 0;
@@ -1421,6 +1441,7 @@ async function syncConversationHistory(req, res) {
 
             // 2. Update Conversation Summary in Firestore (create if missing)
             const convoRef = db.collection("conversations").doc(psid);
+            const tsMs = timestamp.getTime();
             await convoRef.set({
                 id: psid,
                 brandId: brandData.id,
@@ -1428,12 +1449,13 @@ async function syncConversationHistory(req, res) {
                 name: `${profile.first_name || sender.name} ${profile.last_name || ''}`,
                 profilePic: profile.profile_pic || '',
                 lastMessage: lastMsg,
-                timestamp: timestamp,
+                timestamp: tsMs,
+                lastMessageTimestamp: tsMs,
                 unread: convo.unread_count > 0
             }, { merge: true });
 
             // 3. (Optional) Fetch last few messages for this conversation
-            const msgResp = await axios.get(`https://graph.facebook.com/v12.0/${convo.id}/messages?fields=message,from,created_time&limit=20&access_token=${token}`);
+            const msgResp = await axios.get(`https://graph.facebook.com/v21.0/${convo.id}/messages?fields=message,from,created_time&limit=20&access_token=${token}`);
             
             for (const msg of msgResp.data.data) {
                 const isSent = msg.from.id === brandData.facebookPageId;

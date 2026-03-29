@@ -28,17 +28,35 @@ export const useMetaChat = (scrollToBottom, isSelectMode, selectedConvoIds, setS
   const [editingMessage, setEditingMessage] = useState(null);
   const lastConvoIdRef = useRef(null);
 
-  // Conversations Listener
+  // Conversations Listener — ordered by lastMessageTimestamp (numeric ms) for instant top-of-inbox on new messages
   useEffect(() => {
     if (!activeBrandId) return;
     const q = query(
       collection(db, "conversations"), 
       where("brandId", "==", activeBrandId),
-      orderBy("timestamp", "desc")
+      orderBy("lastMessageTimestamp", "desc")
     );
     return onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Client-side sort as safety net (handles docs that may still have old timestamp field)
+      data.sort((a, b) => {
+        const tsA = a.lastMessageTimestamp || a.timestamp?.seconds * 1000 || 0;
+        const tsB = b.lastMessageTimestamp || b.timestamp?.seconds * 1000 || 0;
+        return tsB - tsA;
+      });
       setConversations(data);
+    }, (err) => {
+      // Fallback: if index missing, use timestamp field
+      console.warn('[InboxSort] lastMessageTimestamp index missing, falling back to timestamp:', err.message);
+      const fallbackQ = query(
+        collection(db, "conversations"), 
+        where("brandId", "==", activeBrandId),
+        orderBy("timestamp", "desc")
+      );
+      return onSnapshot(fallbackQ, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setConversations(data);
+      });
     });
   }, [activeBrandId]);
 
