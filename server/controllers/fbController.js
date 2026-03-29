@@ -75,39 +75,43 @@ async function handleWebhookPost(req, res) {
             }
         }
 
-        let body = req.body;
+        const body = req.body;
         const isFB = body.object === 'page';
         const isIG = body.object === 'instagram';
 
         if (isFB || isIG) {
             const tasks = [];
-        for (const entry of body.entry) {
-            const platformId = entry.id;
-            const platformType = isIG ? 'instagram' : 'facebook';
-            serverLog(`[WEBHOOK] Entry.id: ${platformId} | Type: ${platformType}`);
-            const brandData = await getBrandByPlatformId(platformId, platformType);
-            
-            if (!brandData) {
-                serverLog(`[WEBHOOK ERROR] Brand not found for PageID: ${platformId}`);
-                continue;
-            }
-            serverLog(`[WEBHOOK SUCCESS] Matched Brand: ${brandData.name} (${brandData.id})`);
+            for (const entry of body.entry) {
+                const platformId = entry.id;
+                const platformType = isIG ? 'instagram' : 'facebook';
+                
+                // Track incoming webhook
+                serverLog(`[WEBHOOK] Entry.id: ${platformId} | Type: ${platformType}`);
+                
+                const brandData = await getBrandByPlatformId(platformId, platformType);
+                
+                if (!brandData) {
+                    serverLog(`[WEBHOOK ERROR] Brand not found for PageID: ${platformId}`);
+                    continue;
+                }
+                serverLog(`[WEBHOOK SUCCESS] Matched Brand: ${brandData.name} (${brandData.id})`);
 
-            if (entry.messaging) {
-                    const webhook_event = entry.messaging[0];
-                    const sender_psid = webhook_event.sender.id;
-                    webhook_event.platform = platformType;
+                if (entry.messaging) {
+                    for (const webhook_event of entry.messaging) {
+                        const sender_psid = webhook_event.sender.id;
+                        webhook_event.platform = platformType;
 
-                    if (webhook_event.message) {
-                        if (webhook_event.message.is_echo) {
-                            tasks.push(handleEchoMessage(webhook_event, brandData));
-                        } else {
-                            tasks.push(processIncomingMessage(sender_psid, webhook_event.message, brandData, platformType));
+                        if (webhook_event.message) {
+                            if (webhook_event.message.is_echo) {
+                                tasks.push(handleEchoMessage(webhook_event, brandData));
+                            } else {
+                                tasks.push(processIncomingMessage(sender_psid, webhook_event.message, brandData, platformType));
+                            }
                         }
-                    }
 
-                    if (webhook_event.postback) {
-                        tasks.push(handlePostback(sender_psid, webhook_event.postback, brandData, platformType));
+                        if (webhook_event.postback) {
+                            tasks.push(handlePostback(sender_psid, webhook_event.postback, brandData, platformType));
+                        }
                     }
                 }
 
