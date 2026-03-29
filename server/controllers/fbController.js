@@ -100,7 +100,7 @@ async function handleWebhookPost(req, res) {
                 if (!brandData) {
                     serverLog(`[WEBHOOK] Entry.id ${platformId} not found, checking messaging events...`);
                 } else {
-                    serverLog(`[WEBHOOK SUCCESS] Matched Brand: ${brandData.name} (${brandData.id})`);
+                    serverLog(`[WEBHOOK SUCCESS] Matched Brand: ${brandData.name} (FB ID: ${brandData.facebookPageId})`);
                 }
 
                 if (entry.messaging) {
@@ -172,10 +172,10 @@ async function processIncomingComment(commentData, brandData) {
         spamFilter = false, 
         leadCapture = false, 
         sentimentAnalysis = false, 
-        humanDelay = false,
-        aiReply = true,
-        systemAutoReply = true
+        humanDelay = false
     } = settings;
+    const { systemAutoReply, aiReply } = settings;
+    serverLog(`[Comment Engine] Starting. systemAutoReply: ${systemAutoReply}, aiReply: ${aiReply}`);
 
     try {
         // 1. Spam Filter
@@ -245,7 +245,7 @@ async function processIncomingComment(commentData, brandData) {
                 matchedDraftId = draftId;
                 matchedIndex = index;
                 replySent = true;
-                serverLog(`[System] Match found for: ${message}`);
+                serverLog(`[System MATCH] Match found in comment_drafts for: ${message}`);
                 
                 // Track Performance (Hit Rate)
                 const draftRef = db.collection("comment_drafts").doc(draftId);
@@ -257,6 +257,8 @@ async function processIncomingComment(commentData, brandData) {
                         await draftRef.update({ variations });
                     }
                 }
+            } else {
+                serverLog(`[System NO MATCH] No keyword match found for: ${message}`);
             }
         }
 
@@ -364,6 +366,7 @@ async function getShuffledReply(message, brandId, postId = null) {
         if (results.length > 0 && results[0].score <= 0.35) {
             const bestMatch = results[0].item.draft;
             const index = Math.floor(Math.random() * bestMatch.variations.length);
+            serverLog(`[Comment] Global match found for: ${message} (Score: ${results[0].score})`);
             return { variation: bestMatch.variations[index], draftId: bestMatch.id, index };
         }
     }
@@ -590,7 +593,7 @@ async function processThreadedMessage(sender_psid, message, brandData, platformT
     const convoData = await logUserMessage(sender_psid, message, brandData, platformType);
 
         // ── GHOST MODE: Only mark as read if we are actually replying ──
-        serverLog(`[Inbox] Checking Deterministic Flow for ${sender_psid}...`);
+        serverLog(`[Inbox Engine] Checking Deterministic Flow for ${sender_psid}...`);
         const flowHandled = await handleDeterministicFlow(sender_psid, message?.text || "", convoData, brandData)
             .catch(e => { serverLog(`[Error] handleDeterministicFlow: ${e.message}`); return false; });
             
@@ -670,13 +673,14 @@ async function processThreadedMessage(sender_psid, message, brandData, platformT
     // ── DRAFT FIRST CHECK ──
     const matchedReply = await getApprovedInboxDraft(messageText, brandData.id, convoData);
         if (matchedReply) {
-            serverLog(`[DRAFT] Approved match found for: ${message.text}`);
+            serverLog(`[DRAFT MATCH] Approved match found in draft_replies for: ${messageText}`);
             await sendAndLog(sender_psid, matchedReply.result, 'bot', brandData);
             // Track last matched draft for autonomous learning
             await db.collection('conversations').doc(sender_psid).update({
                 lastMatchedDraftId: matchedReply.draftId || null
             });
         } else {
+            serverLog(`[SYSTEM NO MATCH] No keyword match found for: ${messageText}`);
             // Check if Generative AI is enabled for this brand
             const aiSettings = brandData.aiSettings || {};
             if (aiSettings.inboxAiEnabled !== false) {
@@ -970,8 +974,9 @@ async function sendAndLog(psid, text, type, brandData) {
 
         try {
             await sendMessage(psid, { text }, brandData.fbPageToken);
-        } catch (err) {
-            serverLog(`[Simulation] sendMessage failed (expected): ${err.message}`);
+            serverLog(`[Send SUCCESS] Sent ${type} reply to ${psid}`);
+        } catch (error) {
+            serverLog(`[Send ERROR] Failed to send message to ${psid}: ${error.response?.data?.error?.message || error.message}`);
         }
         
         // Log to global logs
