@@ -10,15 +10,20 @@ let serviceAccount;
 try {
   const envKey = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON || process.env.FIREBASE_SERVICE_ACCOUNT;
   if (envKey) {
-    serviceAccount = typeof envKey === 'string' ? JSON.parse(envKey) : envKey;
-    // Fix for private key newlines in Vercel env vars
-    if (serviceAccount.private_key) {
-      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+    try {
+      const sanitizedEnv = typeof envKey === 'string' ? envKey.replace(/\n/g, '\\n') : envKey;
+      serviceAccount = typeof sanitizedEnv === 'string' ? JSON.parse(sanitizedEnv) : sanitizedEnv;
+      if (serviceAccount.private_key) {
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+      }
+    } catch(parseErr) {
+      console.error('Failed to parse Env JSON:', parseErr.message);
     }
-  } else if (fs.existsSync(serviceAccountPath)) {
+  } 
+  
+  if (!serviceAccount && fs.existsSync(serviceAccountPath)) {
     serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-  } else {
-    // Relative fallback
+  } else if (!serviceAccount) {
     const altPath = path.join(__dirname, '..', 'firebase-service-account.json');
     if (fs.existsSync(altPath)) {
       serviceAccount = JSON.parse(fs.readFileSync(altPath, 'utf8'));
