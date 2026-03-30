@@ -59,6 +59,7 @@ async function verifyWebhook(req, res) {
 
 // Handle Webhook Post
 async function handleWebhookPost(req, res) {
+    serverLog(`[WEBHOOK RAW] Received POST to /webhook. Body keys: ${Object.keys(req.body || {}).join(', ')}`);
     try {
         // 0. HMAC Signature Validation (Security Phase 1)
         const signature = req.headers['x-hub-signature-256'] || req.headers['x-hub-signature'];
