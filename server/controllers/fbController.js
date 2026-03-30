@@ -28,6 +28,16 @@ const { extractPhoneNumber, extractAddressSignals, detectBasicIntent } = require
 const Fuse = require('fuse.js');
 const axios = require('axios');
 const { indexBrandProducts, findProductByPHash } = require('../services/productFingerprintService');
+/** 
+ * ========================================================================= 
+ * 🔒 CORE INBOX AUTOMATION SYSTEM (STABLE & SECURE)
+ * WARNING: DO NOT MODIFY THIS FILE WITHOUT EXTREME CAUTION!
+ * 
+ * This file handles the critical Facebook Webhook connection, payload parsing,
+ * and secure Meta API message delivering. Changing logic here without testing 
+ * will break the inbox routing and automation systems. 
+ * ========================================================================= 
+ */
 const crypto = require('crypto');
 
 // --- PHASE 2: MULTI-MESSAGE ACCUMULATOR ---
@@ -800,22 +810,26 @@ async function handleAIResponse(sender_psid, text, brandData) {
         const responseJsonText = result.response.text();
         const jsonMatch = responseJsonText.match(/\{[\s\S]*\}/);
         
+        // FIX: capture final reply text for auto-learning
+        let finalReplyText = '';
         if (jsonMatch) {
             const data = JSON.parse(jsonMatch[0]);
-            await sendAndLog(sender_psid, data.text, 'bot', brandData);
+            finalReplyText = data.text || '';
+            await sendAndLog(sender_psid, finalReplyText, 'bot', brandData);
             if (data.action && data.action !== 'NONE') {
                 await executeRichMediaAction(sender_psid, data.action, data.productId, brandData);
             }
         } else {
-            await sendAndLog(sender_psid, responseJsonText, 'bot', brandData);
+            finalReplyText = responseJsonText;
+            await sendAndLog(sender_psid, finalReplyText, 'bot', brandData);
         }
 
-        // ── AUTO-LEARNING QUEUE ──
-        if (shouldCaptureAsDraft(text)) {
+        // ── AUTO-LEARNING QUEUE ── FIX: was using undefined `responseText`, now uses finalReplyText
+        if (finalReplyText && shouldCaptureAsDraft(text)) {
             const variations = (brandData.autoHyperIndex !== false) ? getLinguisticVariations(text) : [];
             await db.collection("draft_replies").add({
                 keyword: text,
-                result: responseText,
+                result: finalReplyText,
                 variations: variations,
                 status: 'pending',
                 type: 'auto_learned',
@@ -832,13 +846,24 @@ async function handleAIResponse(sender_psid, text, brandData) {
 
 async function handleVisionResponse(psid, imageUrl, text, brandData) {
     try {
+        // FIX: Compute incomingHash from imageUrl before using it
+        let incomingHash = null;
+        try {
+            incomingHash = await generatePHash(imageUrl);
+            serverLog(`[Vision] Computed pHash: ${incomingHash}`);
+        } catch (hashErr) {
+            serverLog(`[Vision] pHash generation failed: ${hashErr.message}`);
+        }
+
         // --- PHASE 1: Zero-Token Product Visual Matcher ---
-        const productMatch = await findProductByPHash(brandData.id, incomingHash);
-        if (productMatch) {
-            serverLog(`[Product Match HIT] Matched with Product: ${productMatch.productName}`);
-            const reply = `আপনার পাঠানো ছবিটি আমাদের "${productMatch.productName}" এর। এর বর্তমান দাম ${productMatch.offerPrice || productMatch.price} টাকা। আপনি কি এটি অর্ডার করতে চান? ✨`;
-            await sendAndLog(psid, reply, 'bot', brandData);
-            return; // ZERO TOKENS!
+        if (incomingHash) {
+            const productMatch = await findProductByPHash(brandData.id, incomingHash);
+            if (productMatch) {
+                serverLog(`[Product Match HIT] Matched with Product: ${productMatch.productName}`);
+                const reply = `আপনার পাঠানো ছবিটি আমাদের "${productMatch.productName}" এর। এর বর্তমান দাম ${productMatch.offerPrice || productMatch.price} টাকা। আপনি কি এটি অর্ডার করতে চান? ✨`;
+                await sendAndLog(psid, reply, 'bot', brandData);
+                return; // ZERO TOKENS!
+            }
         }
 
         // --- PHASE 2: AI-FREE pHash Knowledge Caching ---
@@ -1124,13 +1149,24 @@ async function logUserMessage(psid, message, brandData, platformType = 'facebook
     serverLog(`[LogMsg] Convo state: ${currentData.botState || 'IDLE'}`);
 
     const nowMs = Date.now();
+    // FIX: Save both `name` AND `customerName` so ChatWindow header works correctly
+    const customerName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'FB User';
+    
+    // Build lastMessage summary (handles text + attachments)
+    let lastMessageText = message.text || '';
+    if (!lastMessageText && message.attachments && message.attachments.length > 0) {
+        const attType = message.attachments[0].type || 'file';
+        lastMessageText = attType === 'image' ? '📷 Image' : attType === 'audio' ? '🎤 Voice Message' : '📎 Attachment';
+    }
+
     const updateData = {
         id: psid,
         brandId: brandData.id,
         platform: platformType,
-        name: `${profile.first_name || ''} ${profile.last_name || ''}`,
+        name: customerName,
+        customerName: customerName,  // FIX: ChatWindow uses customerName
         profilePic: profile.profile_pic || '',
-        lastMessage: message.text || '',
+        lastMessage: lastMessageText,
         // Use numeric timestamp for consistent sorting (largest = newest = top of inbox)
         timestamp: nowMs,
         lastMessageTimestamp: nowMs,
@@ -1140,9 +1176,16 @@ async function logUserMessage(psid, message, brandData, platformType = 'facebook
     serverLog(`[LogMsg] Updating convo doc...`);
     await convoRef.set(updateData, { merge: true });
 
+    // FIX: Also save attachments to the message sub-collection
+    const attachmentsToSave = (message.attachments || []).map(att => ({
+        type: att.type,
+        payload: att.payload || {}
+    }));
+
     serverLog(`[LogMsg] Adding to messages subcollection...`);
     await db.collection(`conversations/${psid}/messages`).add({
         text: message.text || '',
+        attachments: attachmentsToSave,
         type: 'received',
         brandId: brandData.id,
         platform: platformType,
@@ -1462,15 +1505,18 @@ async function syncConversationHistory(req, res) {
 
             // Fetch full profile for better UI
             const profile = await getProfile(psid, token);
+            const customerName = `${profile.first_name || sender.name || ''} ${profile.last_name || ''}`.trim() || 'FB User';
 
             // 2. Update Conversation Summary in Firestore (create if missing)
+            // FIX: also save customerName (ChatWindow uses this for header display)
             const convoRef = db.collection("conversations").doc(psid);
             const tsMs = timestamp.getTime();
             await convoRef.set({
                 id: psid,
                 brandId: brandData.id,
                 platform: 'facebook',
-                name: `${profile.first_name || sender.name} ${profile.last_name || ''}`,
+                name: customerName,
+                customerName: customerName,  // FIX: ChatWindow header uses customerName
                 profilePic: profile.profile_pic || '',
                 lastMessage: lastMsg,
                 timestamp: tsMs,
@@ -1478,21 +1524,33 @@ async function syncConversationHistory(req, res) {
                 unread: convo.unread_count > 0
             }, { merge: true });
 
-            // 3. (Optional) Fetch last few messages for this conversation
+            // 3. Fetch last few messages and sync to Firestore sub-collection
+            // FIX: use numeric timestamps (ms) to keep orderBy consistent
             const msgResp = await axios.get(`https://graph.facebook.com/v21.0/${convo.id}/messages?fields=message,from,created_time&limit=20&access_token=${token}`);
             
+            // Check existing message IDs to avoid duplicates
+            const existingSnap = await db.collection(`conversations/${psid}/messages`)
+                .where('fb_msg_id', '!=', null).limit(50).get();
+            const existingIds = new Set(existingSnap.docs.map(d => d.data().fb_msg_id).filter(Boolean));
+
             for (const msg of msgResp.data.data) {
                 const isSent = msg.from.id === brandData.facebookPageId;
                 const msgId = msg.id;
                 
-                // Add to sub-collection
+                // Skip if already synced
+                if (existingIds.has(msgId)) continue;
+                
+                // FIX: Use numeric ms timestamp — NOT a JS Date object
+                const msgTsMs = new Date(msg.created_time).getTime();
+                
                 await db.collection(`conversations/${psid}/messages`).add({
-                    text: msg.message,
+                    text: msg.message || '',
                     type: isSent ? 'sent' : 'received',
                     brandId: brandData.id,
                     platform: 'facebook',
                     fb_msg_id: msgId,
-                    timestamp: new Date(msg.created_time)
+                    timestamp: msgTsMs,
+                    time: new Date(msgTsMs).toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true })
                 });
             }
             count++;
@@ -1623,11 +1681,13 @@ async function sendMessageFromDashboard(req, res) {
             }
         }
 
-        // --- NEW: Persist Dashboard Reply in History ---
+        // --- Persist Dashboard Reply in History ---
+        // FIX: Use numeric timestamp (Date.now()) for ALL message writes
+        // Mixing Firestore Timestamp objects (serverTimestamp) with numbers in the
+        // same collection causes Firestore orderBy to silently exclude some documents.
         try {
-            const now = new Date();
-            const dhakaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Dhaka"}));
-            const timeStr = dhakaTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            const nowMs = Date.now();
+            const timeStr = new Date(nowMs).toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true });
 
             await db.collection(`conversations/${targetId}/messages`).add({
                 text: text || '',
@@ -1635,14 +1695,15 @@ async function sendMessageFromDashboard(req, res) {
                 sender_id: brandData.facebookPageId,
                 brandId: brandData.id,
                 platform: 'facebook',
-                timestamp: serverTimestamp(),
+                timestamp: nowMs,  // FIX: numeric, consistent with all other message writes
                 time: timeStr
             });
 
             // Update parent conversation
             await db.collection('conversations').doc(targetId).set({
-                lastMessage: text,
-                lastMessageTimestamp: serverTimestamp(),
+                lastMessage: text || '',
+                lastMessageTimestamp: nowMs,
+                timestamp: nowMs,
                 unread: false,
                 status: 'replied'
             }, { merge: true });

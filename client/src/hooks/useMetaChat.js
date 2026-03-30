@@ -9,7 +9,6 @@ import {
   doc, 
   updateDoc, 
   addDoc, 
-  serverTimestamp,
   where
 } from 'firebase/firestore';
 import { useBrand } from '../context/BrandContext';
@@ -31,32 +30,30 @@ export const useMetaChat = (scrollToBottom, isSelectMode, selectedConvoIds, setS
   // Conversations Listener — ordered by lastMessageTimestamp (numeric ms) for instant top-of-inbox on new messages
   useEffect(() => {
     if (!activeBrandId) return;
+    
+    // Query WITHOUT orderBy to avoid composite index requirements
     const q = query(
       collection(db, "conversations"), 
-      where("brandId", "==", activeBrandId),
-      orderBy("lastMessageTimestamp", "desc")
+      where("brandId", "==", activeBrandId)
     );
+
     return onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Client-side sort as safety net (handles docs that may still have old timestamp field)
+      
+      // Client-side sort is totally reliable
       data.sort((a, b) => {
-        const tsA = a.lastMessageTimestamp || a.timestamp?.seconds * 1000 || 0;
-        const tsB = b.lastMessageTimestamp || b.timestamp?.seconds * 1000 || 0;
-        return tsB - tsA;
+        const getTs = (obj) => {
+          const t1 = obj.lastMessageTimestamp ? Number(obj.lastMessageTimestamp) : 0;
+          const t2 = obj.timestamp?.seconds ? obj.timestamp.seconds * 1000 : (typeof obj.timestamp === 'number' ? obj.timestamp : 0);
+          return Math.max(t1, t2);
+        };
+        
+        return getTs(b) - getTs(a);
       });
+      
       setConversations(data);
     }, (err) => {
-      // Fallback: if index missing, use timestamp field
-      console.warn('[InboxSort] lastMessageTimestamp index missing, falling back to timestamp:', err.message);
-      const fallbackQ = query(
-        collection(db, "conversations"), 
-        where("brandId", "==", activeBrandId),
-        orderBy("timestamp", "desc")
-      );
-      return onSnapshot(fallbackQ, (snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setConversations(data);
-      });
+      console.error('[InboxSort] Error completely fetching conversations:', err.message);
     });
   }, [activeBrandId]);
 
@@ -81,6 +78,24 @@ export const useMetaChat = (scrollToBottom, isSelectMode, selectedConvoIds, setS
         const behavior = isFirstBatch ? 'auto' : 'smooth';
         setTimeout(() => scrollToBottom(behavior), 50);
         isFirstBatch = false;
+      }
+    }, (err) => {
+      // FIX: Added error callback — previously silent failures caused empty conversations
+      console.error('[Messages Listener ERROR]', err.code, err.message);
+      // If timestamp index is missing, try without orderBy as fallback
+      if (err.code === 'failed-precondition' || err.code === 'unimplemented') {
+        console.warn('[Messages Listener] Falling back to unordered query...');
+        const fallbackQ = query(collection(db, `conversations/${selectedConvo.id}/messages`));
+        onSnapshot(fallbackQ, (snapshot) => {
+          const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          // Sort client-side — handles mixed Timestamp / number types
+          msgs.sort((a, b) => {
+            const getTs = (m) => m.timestamp?.seconds ? m.timestamp.seconds * 1000 : (typeof m.timestamp === 'number' ? m.timestamp : 0);
+            return getTs(a) - getTs(b);
+          });
+          setChatMessages(msgs);
+          if (scrollToBottom) setTimeout(() => scrollToBottom('auto'), 50);
+        });
       }
     });
   }, [selectedConvo, scrollToBottom]);
@@ -139,15 +154,21 @@ export const useMetaChat = (scrollToBottom, isSelectMode, selectedConvoIds, setS
         }
       }
 
+      // FIX: Use numeric timestamp (ms) for ALL message writes to Firestore.
+      // Mixing serverTimestamp() objects with Date.now() numbers in the same
+      // collection causes Firestore orderBy('timestamp','asc') to silently exclude messages.
+      const nowMs = Date.now();
+      const timeStr = new Date(nowMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
       if (editingMessage) {
         await updateDoc(doc(db, `conversations/${selectedConvo.id}/messages`, editingMessage.id), {
-          text, attachments, isEdited: true, updatedAt: serverTimestamp()
+          text, attachments, isEdited: true, updatedAt: nowMs
         });
       } else {
         const msgData = {
           text, attachments, productCard, type: 'sent', brandId: activeBrandId,
-          timestamp: serverTimestamp(),
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          timestamp: nowMs,
+          time: timeStr
         };
         if (replyTo) {
           msgData.replyTo = { id: replyTo.id, text: replyTo.text, type: replyTo.type };
@@ -155,7 +176,9 @@ export const useMetaChat = (scrollToBottom, isSelectMode, selectedConvoIds, setS
         await addDoc(collection(db, `conversations/${selectedConvo.id}/messages`), msgData);
         await updateDoc(doc(db, "conversations", selectedConvo.id), {
           lastMessage: attachments.length > 0 ? (text ? `${text} (Image)` : 'Sent an image') : (productCard ? `📦 ${productCard.name}` : text),
-          brandId: activeBrandId, timestamp: serverTimestamp()
+          brandId: activeBrandId, 
+          timestamp: nowMs,
+          lastMessageTimestamp: nowMs
         });
       }
 
