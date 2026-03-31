@@ -897,7 +897,17 @@ async function handleAIResponse(sender_psid, text, brandData) {
             serverLog(`[Auto-Learn] Capturing AI suggestion (Hyper-Index: ${brandData.autoHyperIndex !== false})`);
         }
     } catch (e) {
-        serverLog(`AI Error [${brandData.name}]: ${e.message}`);
+        serverLog(`[AI ERROR] ${e.message}`);
+        // RESILIENCE FALLBACK: If AI fails, send a polite manual-handoff message so the customer isn't ignored
+        const fallbackMsg = "ধন্যবাদ! আমাদের একজন প্রতিনিধি খুব শীঘ্রই আপনার মেসেজটির উত্তর দিবেন। একটু অপেক্ষা করার জন্য অনুরোধ রইলো। 😊";
+        await sendMessage(sender_psid, { text: fallbackMsg }, brandData.fbPageToken).catch(() => {});
+        
+        // Mark as pending for admin attention
+        await db.collection('conversations').doc(sender_psid).set({ 
+            status: 'pending', 
+            isPriority: true,
+            aiError: e.message 
+        }, { merge: true }).catch(() => {});
     }
 }
 
