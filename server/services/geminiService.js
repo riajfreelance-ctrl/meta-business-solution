@@ -6,13 +6,23 @@ const genAI = new GoogleGenerativeAI(defaultKey);
 const defaultModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 async function getDynamicModel(apiKey) {
-    const customAI = new GoogleGenerativeAI(apiKey || process.env.GEMINI_API_KEY, { apiVersion: 'v1' });
-    return customAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // The second argument is for options in newer SDKs
+    const customKey = apiKey || process.env.GEMINI_API_KEY;
+    const customAI = new GoogleGenerativeAI(customKey);
+    // Explicitly using the v1 model if v1beta is failing
+    return customAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        apiVersion: 'v1' 
+    });
 }
 
 async function getDynamicVisionModel(apiKey) {
-    const customAI = new GoogleGenerativeAI(apiKey || process.env.GEMINI_API_KEY, { apiVersion: 'v1' });
-    return customAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const customKey = apiKey || process.env.GEMINI_API_KEY;
+    const customAI = new GoogleGenerativeAI(customKey);
+    return customAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        apiVersion: 'v1' 
+    });
 }
 
 module.exports = {
