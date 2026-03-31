@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { admin, db, getBrandByPlatformId, serverTimestamp, FieldValue } = require('../services/firestoreService');
 const { getProfile, sendMessage, replyToComment, sendPrivateReply, getPostContent, likeComment, hideComment, sendCarouselMessage, sendSequencedMedia } = require('../services/facebookService');
 const { getDynamicModel, getDynamicVisionModel } = require('../services/geminiService');
