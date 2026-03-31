@@ -35,15 +35,141 @@ const app = express()
     });
 
 // Main Endpoints (Explicit /api prefix for Vercel)
-app.get('/api/status', (req, res) => res.json({ status: 'API Alive', version: '2.0.1-diagnostic' }));
+app.get('/api/status', (req, res) => res.json({ status: 'API Alive', version: '2.1.0-stable' }));
 app.get('/webhook', fbController.verifyWebhook); 
 app.post('/webhook', fbController.handleWebhookPost);
-app.get('/api/webhook', fbController.verifyWebhook); // Safety for both paths
-app.post('/api/webhook', fbController.handleWebhookPost); // Safety for both paths
+app.get('/api/webhook', fbController.verifyWebhook);
+app.post('/api/webhook', fbController.handleWebhookPost);
 
 app.get('/api/ping', async (req, res) => {
     return res.json({ status: 'pong', time: Date.now() });
 });
+
+// ─────────────────────────────────────────────────────────────────────
+// 🩺 HEALTH CHECK ENDPOINTS — Token & Webhook Status Monitor
+// ─────────────────────────────────────────────────────────────────────
+app.get('/api/health/token', async (req, res) => {
+    const axios = require('axios');
+    const { db } = require('./services/firestoreService');
+    const results = [];
+    try {
+        // Check all brands in Firestore
+        const brandsSnap = await db.collection('brands').get();
+        for (const doc of brandsSnap.docs) {
+            const brand = { id: doc.id, ...doc.data() };
+            if (!brand.fbPageToken) {
+                results.push({ brand: brand.name || doc.id, status: 'NO_TOKEN', valid: false });
+                continue;
+            }
+            try {
+                const resp = await axios.get(
+                    `https://graph.facebook.com/v21.0/me?access_token=${brand.fbPageToken}`,
+                    { timeout: 5000 }
+                );
+                results.push({ brand: brand.name || doc.id, status: 'OK', pageId: resp.data.id, pageName: resp.data.name, valid: true });
+            } catch (e) {
+                const errMsg = e.response?.data?.error?.message || e.message;
+                const errCode = e.response?.data?.error?.code;
+                results.push({ brand: brand.name || doc.id, status: 'INVALID', error: errMsg, code: errCode, valid: false });
+            }
+        }
+        // Also check .env token
+        const envToken = process.env.PAGE_ACCESS_TOKEN;
+        if (envToken) {
+            try {
+                const resp = await axios.get(`https://graph.facebook.com/v21.0/me?access_token=${envToken}`, { timeout: 5000 });
+                results.push({ brand: 'ENV_TOKEN', status: 'OK', pageId: resp.data.id, pageName: resp.data.name, valid: true });
+            } catch(e) {
+                results.push({ brand: 'ENV_TOKEN', status: 'INVALID', error: e.response?.data?.error?.message || e.message, valid: false });
+            }
+        }
+        const allValid = results.every(r => r.valid);
+        res.json({ success: true, allValid, tokens: results });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/health/webhook', async (req, res) => {
+    const axios = require('axios');
+    const { db } = require('./services/firestoreService');
+    const results = [];
+    try {
+        const brandsSnap = await db.collection('brands').get();
+        for (const doc of brandsSnap.docs) {
+            const brand = { id: doc.id, ...doc.data() };
+            if (!brand.fbPageToken || !brand.facebookPageId) continue;
+            try {
+                const resp = await axios.get(
+                    `https://graph.facebook.com/v21.0/${brand.facebookPageId}/subscribed_apps?access_token=${brand.fbPageToken}`,
+                    { timeout: 5000 }
+                );
+                const subs = resp.data?.data || [];
+                const fields = subs[0]?.subscribed_fields || [];
+                results.push({
+                    brand: brand.name || doc.id,
+                    hasSubscription: subs.length > 0,
+                    feedSubscribed: fields.includes('feed'),
+                    messagesSubscribed: fields.includes('messages'),
+                    fields: fields
+                });
+            } catch (e) {
+                results.push({ brand: brand.name || doc.id, error: e.response?.data?.error?.message || e.message });
+            }
+        }
+        res.json({ success: true, webhooks: results });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/health/automation', async (req, res) => {
+    const { db } = require('./services/firestoreService');
+    try {
+        const { brandId } = req.query;
+        const query = brandId 
+            ? db.collection('brands').doc(brandId)
+            : db.collection('brands').limit(1);
+
+        const snap = brandId ? await query.get() : await query.get();
+        const docs = brandId ? [snap] : snap.docs;
+
+        const report = [];
+        for (const doc of docs) {
+            const data = doc.exists !== false ? (doc.data ? doc.data() : doc) : null;
+            if (!data) continue;
+            const commentSettings = data.commentSettings || {};
+            const inboxSettings = data.inboxSettings || {};
+            const aiSettings = data.aiSettings || {};
+
+            const [draftsSnap, kbSnap, commentDraftsSnap] = await Promise.all([
+                db.collection('draft_replies').where('brandId', '==', doc.id).limit(1).get(),
+                db.collection('knowledge_base').where('brandId', '==', doc.id).limit(1).get(),
+                db.collection('comment_drafts').where('brandId', '==', doc.id).limit(1).get()
+            ]);
+
+            report.push({
+                brand: data.name || doc.id,
+                brandId: doc.id,
+                tokenPresent: !!data.fbPageToken,
+                commentAutoReply: commentSettings.systemAutoReply !== false,
+                commentAI: commentSettings.aiReply !== false,
+                commentAutoLike: commentSettings.autoLike || false,
+                inboxAutoReply: inboxSettings.systemAutoReply !== false,
+                inboxAI: aiSettings.inboxAiEnabled !== false,
+                hasDraftReplies: !draftsSnap.empty,
+                hasKnowledgeBase: !kbSnap.empty,
+                hasCommentDrafts: !commentDraftsSnap.empty,
+                isLearningMode: data.isLearningMode || false,
+                autoHyperIndex: data.autoHyperIndex !== false
+            });
+        }
+        res.json({ success: true, report });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+// ─────────────────────────────────────────────────────────────────────
 
 app.use('/api', fbRoutes);
 app.use('/api', waRoutes);
@@ -57,7 +183,6 @@ app.post('/api/retention/trigger', checkRole(['admin']), retentionController.tri
 app.get('/api/analytics/bi', checkRole(['admin', 'ads']), analyticsController.getBIStats);
 app.get('/api/analytics/persona-metrics', checkRole(['admin', 'ads']), async (req, res) => {
     const { brandId } = req.query;
-    // For now, return mock data or aggregate from persona_metrics collection
     res.json({ success: true, metrics: [] });
 });
 app.get('/api/settings/automation', checkRole(['admin']), settingsController.getSettings);

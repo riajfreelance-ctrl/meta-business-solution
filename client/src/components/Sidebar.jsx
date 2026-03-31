@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { GripVertical, ChevronDown, ChevronRight, Activity, Building2, Store, AlertTriangle, ShieldCheck } from 'lucide-react';
-import { MetaIcon } from './Icons';
+import { GripVertical, ChevronDown, ChevronRight, Activity, Building2, Store, AlertTriangle, ShieldCheck, Share2 } from 'lucide-react';
+import { MetaIcon, SocialSuiteIcon } from './Icons';
 import { useBrand } from '../context/BrandContext';
 
 const Tooltip = ({ text, show, top }) => {
@@ -36,29 +36,44 @@ const SubmenuPopover = ({ item, show, t, handleTabChange, activeTab, top, onMous
         <div className="absolute left-[-6px] top-8 w-3 h-3 bg-[#0a0f1d] border-l border-b border-white/10 rotate-45 z-0 outline-none" />
         
         <div className="relative z-10 p-2">
-          <div className="px-4 py-3 border-b border-white/5 mb-2">
+          <div className="px-4 py-3 border-b border-white/5 mb-2 flex justify-between items-center">
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-prime-400 bg-prime-500/10 px-3 py-1.5 rounded-lg inline-block">{t(item.label)}</p>
           </div>
-          <div className="space-y-1">
-            {item.sub.map(sub => (
-              <button
-                key={sub.id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleTabChange(sub.id);
-                }}
-                className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
-                  activeTab === sub.id 
-                    ? 'bg-gradient-to-r from-prime-600 to-purple-600 text-white shadow-lg shadow-prime-500/20' 
-                    : 'text-gray-400 hover:bg-white/5 hover:text-white hover:translate-x-1'
-                }`}
-              >
-                <div className={`p-2 rounded-lg transition-colors ${activeTab === sub.id ? 'bg-white/20' : 'bg-white/5'}`}>
-                  {sub.icon && <sub.icon size={14} className={activeTab === sub.id ? 'text-white' : 'text-prime-400/60'} />}
+          <div className="space-y-4">
+            {/* Group by Category if it exists */}
+            {(() => {
+              const categories = [...new Set(item.sub.map(s => s.category || 'Other'))];
+              return categories.map(cat => (
+                <div key={cat} className="space-y-2">
+                  <div className="px-4 flex items-center gap-2">
+                    <div className="h-[1px] flex-1 bg-white/5" />
+                    <span className="text-[8px] font-black uppercase tracking-[.2em] text-gray-500">{cat}</span>
+                    <div className="h-[1px] flex-1 bg-white/5" />
+                  </div>
+                  <div className={`grid ${cat === 'All' ? 'grid-cols-1' : 'grid-cols-2'} gap-2 px-2`}>
+                    {item.sub.filter(s => (s.category || 'Other') === cat).map(sub => (
+                      <button
+                        key={sub.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTabChange(sub.id);
+                        }}
+                        className={`group flex items-center justify-center flex-col gap-2 p-4 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all duration-300 border ${
+                          activeTab === sub.id 
+                            ? 'bg-gradient-to-br from-prime-600/20 to-purple-600/20 border-prime-500/50 text-white shadow-lg' 
+                            : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10 hover:text-white hover:-translate-y-0.5'
+                        }`}
+                      >
+                        <div className={`p-2 rounded-xl transition-all duration-500 ${activeTab === sub.id ? 'bg-prime-500 text-white scale-110 shadow-lg shadow-prime-500/50' : 'bg-white/5 text-prime-400/60 group-hover:bg-prime-500/20 group-hover:text-prime-400'}`}>
+                          {sub.icon && <sub.icon size={16} />}
+                        </div>
+                        <span className="text-center truncate w-full">{t(sub.label)}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <span>{t(sub.label)}</span>
-              </button>
-            ))}
+              ));
+            })()}
           </div>
         </div>
       </div>
@@ -301,10 +316,20 @@ const Sidebar = ({
                   }}
                 >
                   <div className="flex items-center gap-4 min-w-0">
-                    <div className={`p-2.5 rounded-2xl transition-all duration-500 ${
-                      isParentActive ? 'bg-prime-500/20 text-prime-400 font-bold' : 'bg-white/5 group-hover:bg-prime-500/10'
-                    }`}>
-                      <item.icon size={18} className="shrink-0" />
+                    <div className="relative group/icon-container">
+                      <div className={`relative p-2.5 rounded-[1.2rem] transition-all duration-700 shadow-xl overflow-hidden group-hover/btn:scale-110 group-hover/btn:-rotate-6 border-t border-white/20 ${
+                        item.id === 'home' ? 'bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-500/20' :
+                        item.id === 'social_suite' ? 'bg-gradient-to-br from-emerald-400 to-teal-600 shadow-emerald-500/20' :
+                        item.id === 'products_hub' ? 'bg-gradient-to-br from-orange-400 to-pink-600 shadow-orange-500/20' :
+                        item.id === 'data' ? 'bg-gradient-to-br from-fuchsia-500 to-purple-700 shadow-fuchsia-500/20' :
+                        item.id === 'admin' ? 'bg-gradient-to-br from-rose-500 to-red-700 shadow-rose-500/20' :
+                        item.id === 'settings_tab' ? 'bg-gradient-to-br from-slate-400 to-slate-600 shadow-slate-500/20' :
+                        'bg-gradient-to-br from-prime-500 to-prime-700 shadow-prime-500/20'
+                      } ${!isParentActive && 'opacity-80 grayscale-[0.5] group-hover/btn:grayscale-0 group-hover/btn:opacity-100'}`}>
+                        {/* Apple-style Gloss Layer */}
+                        <div className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent pointer-events-none" />
+                        <item.icon size={22} className="shrink-0 text-white relative z-10 drop-shadow-md" strokeWidth={2} />
+                      </div>
                     </div>
                     {!isSidebarCollapsed && (
                       <span className={`truncate text-[10px] uppercase font-black tracking-[0.1em] ${hasSub ? 'opacity-100' : 'opacity-80'}`}>
@@ -326,43 +351,49 @@ const Sidebar = ({
                   )}
                 </MagneticButton>
                 
-                {hasSub && isExpanded && !isSidebarCollapsed && (
-                  <div className="ml-12 space-y-2 animate-in slide-in-from-top-4 duration-500 pr-2">
-                    {item.sub.map((subItem, subIndex) => (
-                      <div 
-                        key={subItem.id}
-                        draggable
-                        onDragStart={(e) => {
-                          e.stopPropagation();
-                          handleDragStart(e, 'sub', index, subIndex);
-                        }}
-                        onDragOver={(e) => {
-                          e.stopPropagation();
-                          handleDragOver(e, 'sub', index, subIndex);
-                        }}
-                        onDragEnd={handleDragEnd}
-                        onDrop={handleDrop}
-                      >
-                        <button
-                          onClick={() => handleTabChange(subItem.id)}
-                          className={`w-full flex items-center justify-between px-4 py-4 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all relative group/sub ${
-                            activeTab === subItem.id 
-                              ? 'text-prime-400 bg-prime-500/5 shadow-[inset_0_0_20px_rgba(139,92,246,0.1)]'
-                              : 'text-gray-500 hover:text-white hover:translate-x-1'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`p-1.5 rounded-lg transition-all duration-300 ${activeTab === subItem.id ? 'bg-prime-500/10 text-prime-500 scale-110' : 'bg-white/5 text-gray-700 group-hover/sub:text-gray-400'}`}>
-                              {subItem.icon && <subItem.icon size={12} />}
-                            </div>
-                            <span className="truncate">{t(subItem.label)}</span>
-                          </div>
-                          {activeTab === subItem.id && <Activity size={10} className="text-prime-400 animate-pulse" />}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                 {hasSub && isExpanded && !isSidebarCollapsed && (
+                   <div className="ml-12 space-y-2 animate-in slide-in-from-top-4 duration-500 pr-2">
+                     {item.sub.map((subItem, subIndex) => {
+                       const isSubActive = activeTab === subItem.id;
+                       return (
+                         <div 
+                           key={subItem.id}
+                           draggable
+                           onDragStart={(e) => {
+                             e.stopPropagation();
+                             handleDragStart(e, 'sub', index, subIndex);
+                           }}
+                           onDragOver={(e) => {
+                             e.stopPropagation();
+                             handleDragOver(e, 'sub', index, subIndex);
+                           }}
+                           onDragEnd={handleDragEnd}
+                           onDrop={handleDrop}
+                         >
+                           <button
+                             onClick={() => handleTabChange(subItem.id)}
+                             className={`w-full flex items-center justify-between px-4 py-4 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all relative group/sub ${
+                               isSubActive 
+                                 ? 'text-prime-400 bg-prime-500/5 shadow-[inset_0_0_20px_rgba(139,92,246,0.1)]'
+                                 : 'text-gray-500 hover:text-white hover:translate-x-1'
+                             }`}
+                           >
+                             <div className="flex items-center gap-3">
+                               <div className={`p-2 rounded-xl transition-all duration-500 border-t border-white/10 ${
+                               isSubActive 
+                                 ? 'bg-gradient-to-br from-prime-400 to-prime-600 text-white shadow-lg' 
+                                 : 'bg-white/5 text-gray-500 group-hover/sub:bg-white/10'
+                             }`}>
+                               <subItem.icon size={18} strokeWidth={isSubActive ? 3 : 2} />
+                             </div>
+                               <span className="truncate">{t(subItem.label)}</span>
+                             </div>
+                             {isSubActive && <Activity size={10} className="text-prime-400 animate-pulse" />}
+                           </button>
+                         </div>
+                       )})}
+                   </div>
+                 )}
               </div>
             );
           })}

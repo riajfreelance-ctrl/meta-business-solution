@@ -46,6 +46,29 @@ const messageAccumulator = new Map();
 // ------------------------------------------
 let lastSuccessfulBucket = null;
 
+// ─── DUPLICATE COMMENT REPLY PREVENTION ───
+// In-memory set to track comment IDs already replied to (clears on restart)
+const repliedCommentIds = new Set();
+
+// ─── FB API RETRY WRAPPER ───
+async function withRetry(fn, retries = 3, delayMs = 1500) {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            return await fn();
+        } catch (e) {
+            const errCode = e.response?.data?.error?.code;
+            const isRateLimit = errCode === 32 || errCode === 17 || errCode === 613;
+            const isTransient = errCode === 1 || errCode === 2;
+            if ((isRateLimit || isTransient) && attempt < retries) {
+                serverLog(`[RETRY ${attempt}/${retries}] FB API error ${errCode}. Waiting ${delayMs}ms...`);
+                await new Promise(r => setTimeout(r, delayMs * attempt));
+            } else {
+                throw e;
+            }
+        }
+    }
+}
+
 // Webhook Verification
 async function verifyWebhook(req, res) {
     let mode = req.query['hub.mode'];
@@ -195,6 +218,27 @@ async function processIncomingComment(commentData, brandData) {
 
     if (sender_id === brandData.facebookPageId) return;
 
+    // ── DUPLICATE PREVENTION: Skip if already replied to this comment ──
+    if (repliedCommentIds.has(comment_id)) {
+        serverLog(`[DUPLICATE] Comment ${comment_id} already processed. Skipping.`);
+        return;
+    }
+
+    // ── Also check Firestore for persistent duplicate check (across restarts) ──
+    try {
+        const existingReply = await db.collection('comments')
+            .where('comment_id', '==', comment_id)
+            .limit(1)
+            .get();
+        if (!existingReply.empty) {
+            serverLog(`[DUPLICATE DB] Comment ${comment_id} already in Firestore. Skipping.`);
+            repliedCommentIds.add(comment_id);
+            return;
+        }
+    } catch (dupErr) {
+        serverLog(`[DUPLICATE CHECK ERROR] ${dupErr.message}`);
+    }
+
     serverLog(`[Comment - ${brandData.name}] from ${from.name}: ${message}`);
     const settings = brandData.commentSettings || {};
     const { 
@@ -204,8 +248,13 @@ async function processIncomingComment(commentData, brandData) {
         sentimentAnalysis = false, 
         humanDelay = false
     } = settings;
-    const { systemAutoReply, aiReply } = settings;
+    // ── FIX: Default systemAutoReply and aiReply to TRUE if not explicitly set ──
+    const systemAutoReply = settings.systemAutoReply !== false; // default ON
+    const aiReply = settings.aiReply !== false;                 // default ON
     serverLog(`[Comment Engine] Starting. systemAutoReply: ${systemAutoReply}, aiReply: ${aiReply}`);
+
+    // Mark as being processed immediately to prevent race conditions
+    repliedCommentIds.add(comment_id);
 
     try {
         // 1. Spam Filter
@@ -307,21 +356,29 @@ async function processIncomingComment(commentData, brandData) {
         if (replySent) {
             if (humanDelay) await new Promise(r => setTimeout(r, Math.random() * 5000 + 5000));
             
-            // Public Reply
-            await replyToComment(comment_id, publicReply, brandData.fbPageToken);
+            // Public Reply — with retry
+            await withRetry(() => replyToComment(comment_id, publicReply, brandData.fbPageToken));
             
-            // Private Reply (Inbox Message)
+            // Private Reply (Inbox Message) — with retry
             if (privateReply) {
-                await sendPrivateReply(comment_id, privateReply, brandData.fbPageToken);
+                try {
+                    await withRetry(() => sendPrivateReply(comment_id, privateReply, brandData.fbPageToken));
+                } catch (dmErr) {
+                    serverLog(`[DM WARN] Private reply failed (may be FB limitation): ${dmErr.message}`);
+                }
                 
                 // If there's a button, send it as a follow-up template
                 if (matchedVariation && matchedVariation.buttonText && matchedVariation.buttonUrl) {
                     const { sendButtonTemplate } = require('../services/facebookService');
                     // We use the sender_id (PSID) from the comment webhook
-                    await sendButtonTemplate(sender_id, matchedVariation.privateReply, {
-                        text: matchedVariation.buttonText,
-                        url: matchedVariation.buttonUrl
-                    }, brandData.fbPageToken);
+                    try {
+                        await sendButtonTemplate(sender_id, matchedVariation.privateReply, {
+                            text: matchedVariation.buttonText,
+                            url: matchedVariation.buttonUrl
+                        }, brandData.fbPageToken);
+                    } catch (btnErr) {
+                        serverLog(`[BUTTON WARN] Button template failed: ${btnErr.message}`);
+                    }
                 }
             }
         } else {

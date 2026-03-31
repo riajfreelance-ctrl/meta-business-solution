@@ -20,7 +20,7 @@ async function subscribePage() {
 
     // 1. Subscribe to Webhooks
     const subscribeResp = await axios.post(`https://graph.facebook.com/v21.0/me/subscribed_apps`, {
-      subscribed_fields: ['messages', 'messaging_postbacks', 'messaging_optins']
+      subscribed_fields: ['messages', 'messaging_postbacks', 'messaging_optins', 'feed']
     }, {
       params: { access_token: fbPageToken }
     });

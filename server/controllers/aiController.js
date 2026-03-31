@@ -26,17 +26,36 @@ async function generateVariations(req, res) {
 }
 
 async function generateLinguisticVariations(req, res) {
-    const { draftId, keyword } = req.body;
+    const { draftId, keyword, options = [] } = req.body;
     if (!draftId || !keyword) return res.status(400).send('Missing ID or Keyword');
 
     try {
-        const { getLinguisticVariations } = require('../utils/linguisticEngine');
-        const variations = getLinguisticVariations(keyword);
-        
-        const draftRef = db.collection('draft_replies').doc(draftId);
-        await draftRef.update({ variations: variations });
-        
-        res.json({ success: true, variations });
+        if (options && options.length > 0) {
+           serverLog(`Smart Linguistic Gen for: ${keyword} with options: ${options.join(',')}`);
+           const prompt = `A customer from Bangladesh is asking about "${keyword}". 
+Generate exactly 25 conversational variations for this intention. 
+CRITICAL RULES:
+- Include the following specific linguistic styles as requested by the user:
+${options.map(o => `  * ${o}`).join('\n')}
+- Keep them short, like real chat messages.
+- Return ONLY a valid JSON flat array of strings. No extra text, no markdown block syntax. Example: ["dam koto", "ki obostha", "koto tk"]`;
+
+           const result = await defaultModel.generateContent(prompt);
+           const response = await result.response;
+           let text = response.text().replace(/```json|```/g, '').trim();
+           
+           const variations = JSON.parse(text);
+           const draftRef = db.collection('draft_replies').doc(draftId);
+           await draftRef.update({ variations });
+           return res.json({ success: true, variations });
+        } else {
+           // Fallback to legacy static engine
+           const { getLinguisticVariations } = require('../utils/linguisticEngine');
+           const variations = getLinguisticVariations(keyword);
+           const draftRef = db.collection('draft_replies').doc(draftId);
+           await draftRef.update({ variations });
+           return res.json({ success: true, variations });
+        }
     } catch (error) {
         serverLog('LINGUISTIC VARIATION ERROR: ' + error.message);
         res.status(500).json({ error: error.message });

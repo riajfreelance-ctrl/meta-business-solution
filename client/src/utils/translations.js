@@ -124,6 +124,9 @@ export const translations = {
     lead_capture: 'Lead Capture',
     sentiment_analysis: 'Sentiment Analysis',
     human_delay: 'Human-like Delay',
+    social_suite_desc: 'Unified command center for all your Meta ecosystem communications.',
+    products_hub_desc: 'Full-spectrum commerce engine for managing products, orders, and inventory.',
+    data_engine_desc: 'Autonomous intelligence core for bridging knowledge gaps and drafting responses.',
     settings_saved: 'Settings Saved Successfully',
   },
   bn: {
@@ -254,6 +257,9 @@ export const translations = {
     sentiment_analysis: 'সেন্টিমেন্ট অ্যানালাইসিস',
     human_delay: 'হিউম্যান-লাইক ডিলে',
     aiGenerate: 'AI দিয়ে জেনারেট করুন',
+    social_suite_desc: 'মেটা সিস্টেমের সকল যোগাযোগের জন্য একটি ইউনিফাইড কমান্ড সেন্টার।',
+    products_hub_desc: 'পণ্য, অর্ডার এবং ইনভেন্টরি ম্যানেজমেন্টের জন্য একটি পূর্ণাঙ্গ কমার্স ইঞ্জিন।',
+    data_engine_desc: 'নলেজ গ্যাপ পূরণ করা এবং রিপ্লাই ড্রাফট করার জন্য একটি স্বয়ংক্রিয় ইন্টেলিজেন্স কোর।',
     settings_saved: 'সেটিংস সফলভাবে সংরক্ষিত হয়েছে',
   }
 };

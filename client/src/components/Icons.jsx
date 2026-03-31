@@ -134,3 +134,11 @@ export const ArchitectIcon = ({ size = 16 }) => (
     <line x1="10" y1="12" x2="14" y2="12"></line>
   </svg>
 );
+
+export const SocialSuiteIcon = ({ size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#8B5CF6]">
+    <rect x="2" y="2" width="20" height="20" rx="4" />
+    <path d="M22 2L11 13" />
+    <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+  </svg>
+);

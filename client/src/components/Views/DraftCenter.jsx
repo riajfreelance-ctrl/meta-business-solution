@@ -20,6 +20,33 @@ const DraftCenter = ({
   const [selectedDrafts, setSelectedDrafts] = useState(new Set());
   const [activeTab, setActiveTab] = useState('approved'); // 'approved' or 'pending'
   const [editingVar, setEditingVar] = useState({ draftId: null, index: null, value: '' });
+  
+  const [isLinguisticModalOpen, setIsLinguisticModalOpen] = useState(false);
+  const [selectedLinguisticOptions, setSelectedLinguisticOptions] = useState([
+    'Benglish/Banglish (Romanized)',
+    'Common Typo Patterns',
+    'Colloquial/Slang',
+    'Polite/Formal'
+  ]);
+
+  const linguisticChoices = [
+    'Benglish/Banglish (Romanized)',
+    'Common Typo Patterns',
+    'Colloquial/Slang',
+    'Polite/Formal',
+    'Question Forms',
+    'Aggressive/Urgent',
+    'Emoji Heavy'
+  ];
+
+  const toggleLinguisticOption = (option) => {
+    const newOptions = [...selectedLinguisticOptions];
+    if (newOptions.includes(option)) {
+      setSelectedLinguisticOptions(newOptions.filter(o => o !== option));
+    } else {
+      setSelectedLinguisticOptions([...newOptions, option]);
+    }
+  };
 
   const toggleSelect = (id) => {
     const newSelected = new Set(selectedDrafts);
@@ -56,6 +83,16 @@ const DraftCenter = ({
        }
      }
      setSelectedDrafts(new Set());
+  };
+
+  const handleBulkLinguisticExpand = async () => {
+    for (const id of selectedDrafts) {
+      const draft = drafts.find(d => d.id === id);
+      if (draft) {
+        await handleLinguisticExpand(id, draft.keyword);
+      }
+    }
+    setSelectedDrafts(new Set());
   };
 
   const handleRestoreDraft = async (draftId) => {
@@ -308,22 +345,31 @@ const DraftCenter = ({
         </div>
 
         {selectedDrafts.size > 0 && (
-          <div className="flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-500">
+          <div className="flex flex-wrap items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-500">
              <button 
               onClick={() => {
                 if (selectedDrafts.size === drafts.length) setSelectedDrafts(new Set());
                 else setSelectedDrafts(new Set(drafts.map(d => d.id)));
               }}
-              className={`text-[10px] uppercase font-black tracking-widest px-4 py-2 rounded-xl border transition-all ${
+              className={`text-[10px] uppercase font-black tracking-widest px-4 py-2.5 rounded-xl border transition-all ${
                 isDarkMode ? 'text-gray-500 hover:text-white bg-white/5 border-white/5 hover:border-white/10' : 'text-gray-400 hover:text-gray-900 bg-gray-50 border-gray-200 hover:border-gray-300'
               }`}
             >
               {selectedDrafts.size === drafts.length ? 'Deselect All' : 'Select All'}
             </button>
             <div className={`h-6 w-px ${isDarkMode ? 'bg-white/10' : 'bg-gray-200'} mx-1`} />
+            
+            <button 
+              onClick={handleBulkLinguisticExpand}
+              className="px-6 py-2.5 bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-[0_0_20px_rgba(99,102,241,0.3)] hover:shadow-[0_0_30px_rgba(99,102,241,0.5)] active:scale-95 transition-all flex items-center gap-2 border border-indigo-400/30 animate-pulse-slow"
+            >
+              <Globe size={14} className="animate-spin-slow" />
+              Linguistic Expand ({selectedDrafts.size})
+            </button>
+
             <button 
               onClick={handleBulkApprove}
-              className="px-5 py-2.5 bg-prime-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-prime-500/10 active:scale-95 transition-all"
+              className="px-6 py-2.5 bg-prime-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-prime-500/10 active:scale-95 transition-all"
             >
               Approve {selectedDrafts.size}
             </button>
@@ -595,7 +641,7 @@ const DraftCenter = ({
                         </div>
                         <div className="flex items-center gap-3">
                             <button 
-                              onClick={() => handleLinguisticExpand(selectedDetailDraft.id, selectedDetailDraft.keyword)}
+                              onClick={() => setIsLinguisticModalOpen(true)}
                               className={`flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all border ${
                                 expandingId === selectedDetailDraft.id ? 'bg-indigo-500/20 text-indigo-400 animate-pulse' : 'bg-white/5 text-gray-400 hover:text-white border-white/5'
                               }`}
@@ -812,6 +858,58 @@ const DraftCenter = ({
                    </button>
                 </div>
              </div>
+          </div>
+        </div>
+      )}
+      {/* Linguistic Expansion Options Modal */}
+      {isLinguisticModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+          <div className={`w-full max-w-md rounded-[2.5rem] border p-8 space-y-6 ${isDarkMode ? 'bg-[#021024] border-white/10 text-white' : 'bg-white border-black/5 text-gray-900'}`}>
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-indigo-500/20 rounded-2xl text-indigo-400">
+                <Globe size={24} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black tracking-tighter">Linguistic Style</h3>
+                <p className="text-[9px] font-black uppercase text-gray-500 tracking-widest">Select Expansion Marks</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2">
+              {linguisticChoices.map(option => (
+                <button
+                  key={option}
+                  onClick={() => toggleLinguisticOption(option)}
+                  className={`flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${
+                    selectedLinguisticOptions.includes(option)
+                      ? 'border-indigo-500/50 bg-indigo-500/10 text-indigo-400'
+                      : 'border-white/5 bg-white/5 text-gray-500 hover:border-white/10'
+                  }`}
+                >
+                  <span className="text-xs font-bold">{option}</span>
+                  {selectedLinguisticOptions.includes(option) && <CheckCircle size={14} />}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <button 
+                onClick={() => setIsLinguisticModalOpen(false)}
+                className="flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-white/5 text-gray-500 hover:text-white transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  handleLinguisticExpand(selectedDetailDraft.id, selectedDetailDraft.keyword, selectedLinguisticOptions);
+                  setIsLinguisticModalOpen(false);
+                }}
+                disabled={selectedLinguisticOptions.length === 0}
+                className="flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 transition-all hover:bg-indigo-700 disabled:opacity-50"
+              >
+                Start Expansion
+              </button>
+            </div>
           </div>
         </div>
       )}

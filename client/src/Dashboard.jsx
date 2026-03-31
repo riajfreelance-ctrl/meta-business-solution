@@ -20,14 +20,24 @@ import {
   AlertCircle,
   BookOpen,
   Cpu,
-  RotateCcw, Bookmark, Star, ChevronDown, Plus,
+  RotateCcw, Bookmark, Star, ChevronDown, Plus, Globe,
   Maximize, ZoomIn, ZoomOut, ChevronLeft, ChevronRight,
   X, XCircle, Info, Download, ShoppingCart
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 // Import Modular Components
-import { MetaIcon, MessengerIcon, FacebookIcon, InstagramIcon, WhatsAppIcon } from './components/Icons';
+import { 
+  MetaIcon, 
+  MessengerIcon, 
+  FacebookIcon, 
+  InstagramIcon, 
+  WhatsAppIcon, 
+  SocialSuiteIcon,
+  FBCommentIcon,
+  IGDirectIcon,
+  IGCommentIcon
+} from './components/Icons';
 import InboxFilterBar from './components/Inbox/InboxFilterBar';
 import InboxList from './components/Inbox/InboxList';
 import ChatWindow from './components/Inbox/ChatWindow';
@@ -52,6 +62,7 @@ import SuperAdminPanel from './components/Views/SuperAdminPanel';
 import GlobalBanner from './components/Shared/GlobalBanner';
 import BillingView from './components/Views/BillingView';
 import AuthView from './components/Views/AuthView';
+import CategoryHub from './components/Views/CategoryHub';
 
 // Import Hooks
 import { useMetaChat } from './hooks/useMetaChat';
@@ -145,6 +156,20 @@ const Dashboard = () => {
   const [lightbox, setLightbox] = useState({ isOpen: false, images: [], index: 0, zoom: 1 });
   const [isBrandOnboardingOpen, setIsBrandOnboardingOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [navPicker, setNavPicker] = useState({ isOpen: false, slotIndex: null });
+  const [navSlots, setNavSlots] = useState(() => {
+    const saved = localStorage.getItem('metasolution_nav_slots');
+    return saved ? JSON.parse(saved) : [
+      { id: 'menu', type: 'special' },
+      { id: 'home' },
+      { id: 'fb_inbox' },
+      { id: 'settings_tab' },
+      { id: 'admin', show: role === 'super-admin' }
+    ];
+  });
+
+  // Long press timer ref
+  const longPressTimer = useRef(null);
   
   // --- Refs ---
   const chatEndRef = useRef(null);
@@ -207,6 +232,10 @@ const Dashboard = () => {
   useEffect(() => {
     localStorage.setItem('metasolution_sidebar_collapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
+
+  useEffect(() => {
+    localStorage.setItem('metasolution_nav_slots', JSON.stringify(navSlots));
+  }, [navSlots]);
 
   // Click Outside Profile
   useEffect(() => {
@@ -349,13 +378,13 @@ const Dashboard = () => {
       }
    };
 
-   const handleLinguisticExpand = async (id, kw) => {
+   const handleLinguisticExpand = async (id, kw, options = []) => {
       setExpandingId(id);
       try {
         const response = await fetch(`${import.meta.env.VITE_API_URL}/api/generate_linguistic_variations`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ draftId: id, keyword: kw })
+          body: JSON.stringify({ draftId: id, keyword: kw, options })
         });
         if (!response.ok) throw new Error('Generation failed');
       } catch (e) {
@@ -403,29 +432,16 @@ const Dashboard = () => {
   const mainNav = useMemo(() => [
     { id: 'home', icon: Activity, label: 'home', fixed: true },
     { 
-      id: 'facebook', 
-      icon: FacebookIcon, 
-      label: 'facebook',
+      id: 'social_suite', 
+      icon: SocialSuiteIcon, 
+      label: 'social_suite',
       sub: [
-        { id: 'fb_inbox', label: 'inbox', icon: MessageSquare },
-        { id: 'fb_comments', label: 'comments', icon: MessageCircle }
-      ]
-    },
-    { 
-      id: 'instagram', 
-      icon: InstagramIcon, 
-      label: 'instagram',
-      sub: [
-        { id: 'ig_inbox', label: 'inbox', icon: MessageSquare },
-        { id: 'ig_comments', label: 'comments', icon: MessageCircle }
-      ]
-    },
-    { 
-      id: 'whatsapp', 
-      icon: WhatsAppIcon, 
-      label: 'whatsapp',
-      sub: [
-        { id: 'wa_inbox', label: 'inbox', icon: MessageSquare }
+        { id: 'all_social', label: 'all_conversations', icon: Activity, category: 'All' },
+        { id: 'fb_inbox', label: 'inbox', icon: MessengerIcon, category: 'Facebook' },
+        { id: 'fb_comments', label: 'comments', icon: FBCommentIcon, category: 'Facebook' },
+        { id: 'ig_inbox', label: 'inbox', icon: IGDirectIcon, category: 'Instagram' },
+        { id: 'ig_comments', label: 'comments', icon: IGCommentIcon, category: 'Instagram' },
+        { id: 'wa_inbox', label: 'inbox', icon: WhatsAppIcon, category: 'WhatsApp' },
       ]
     },
     { 
@@ -453,6 +469,58 @@ const Dashboard = () => {
     ...((role === 'super-admin') ? [{ id: 'admin', icon: ShieldCheck, label: 'admin' }] : []),
     { id: 'settings_tab', icon: Settings, label: 'setting' },
   ], [role]);
+
+  const activeMainCategory = useMemo(() => {
+    return mainNav.find(item => item.id === activeTab && item.sub);
+  }, [activeTab, mainNav]);
+
+  const hubMetrics = useMemo(() => {
+    if (!activeMainCategory) return [];
+    
+    if (activeMainCategory.id === 'social_suite') {
+      const unread = (allConversations || []).filter(c => c.unread).length;
+      const connected = (brandData?.platforms?.length || 0);
+      const priority = (allConversations || []).filter(c => c.isPriority || c.isFollowUp).length;
+      return [
+        { label: 'Nodes', value: connected, icon: Globe },
+        { label: 'Unread', value: unread, icon: MessageSquare },
+        { label: 'Leads', value: priority, icon: Star },
+        { label: 'AI Auth.', value: '94%', icon: Cpu },
+        { label: 'Response', value: '12ms', icon: Activity },
+        { label: 'Active', value: (allConversations || []).length, icon: TrendingUp }
+      ];
+    }
+    
+    if (activeMainCategory.id === 'products_hub') {
+      const total = (products || []).length;
+      const pending = (orders || []).filter(o => o.status === 'pending').length;
+      const lowStock = (products || []).filter(p => (p.stock || 0) < 5).length;
+      return [
+        { label: 'Live', value: total, icon: Package },
+        { label: 'Pending', value: pending, icon: ShoppingBag },
+        { label: 'Stock Low', value: lowStock, icon: AlertCircle },
+        { label: 'Velocity', value: '3.2/d', icon: TrendingUp },
+        { label: 'Health', value: '98%', icon: ShieldCheck },
+        { label: 'Growth', value: '+12%', icon: Star }
+      ];
+    }
+    
+    if (activeMainCategory.id === 'data_engine') {
+      const nodes = (library || []).length;
+      const pendingGaps = (gaps || []).filter(g => g.status === 'pending').length;
+      const syncLevel = '94%';
+      return [
+        { label: 'AI Nodes', value: nodes, icon: Cpu },
+        { label: 'Gaps', value: pendingGaps, icon: BookOpen },
+        { label: 'Sync', value: syncLevel, icon: RotateCcw },
+        { label: 'Accuracy', value: '99.2%', icon: ShieldCheck },
+        { label: 'Load', value: '12%', icon: Activity },
+        { label: 'Last Sync', value: '12m', icon: Activity }
+      ];
+    }
+    
+    return [];
+  }, [activeMainCategory, allConversations, brandData, products, orders, library, gaps]);
 
   // --- Profile Component ---
   const ProfileDropdown = () => (
@@ -483,55 +551,189 @@ const Dashboard = () => {
       </div>
     </div>
   );
-  // --- Bottom Navigation (Mobile) ---
-  const BottomNav = () => (
-    <div className="lg:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] w-[94%] max-w-[440px] animate-in fade-in slide-in-from-bottom-12 duration-1000">
-      <div className={`relative flex justify-around items-center px-3 py-2.5 rounded-[3rem] border shadow-[0_30px_60px_-15px_rgba(0,0,0,0.6)] backdrop-blur-3xl overflow-hidden ${
-        isDarkMode 
-          ? 'bg-[#0a0f1d]/85 border-white/10 shadow-black' 
-          : 'bg-white/95 border-black/5 shadow-gray-300'
-      }`}>
-        {/* Modern "Aura" Background Effect */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-prime-500/5 via-transparent to-prime-500/5 pointer-events-none" />
-        
-        {[
-          { id: 'home', icon: Activity },
-          { id: 'fb_inbox', icon: MessageSquare },
-          { id: 'admin', icon: ShieldCheck, show: role === 'super-admin' },
-          { id: 'settings_tab', icon: Settings },
-          { id: 'menu', icon: PanelLeft, label: 'Menu', onClick: () => setIsMobileMenuOpen(!isMobileMenuOpen) }
-        ].filter(item => item.show !== false).map(item => {
-          const isActive = activeTab === item.id || (item.id === 'menu' && isMobileMenuOpen);
-          return (
-            <button
-              key={item.id}
-              onClick={item.onClick || (() => handleTabChange(item.id))}
-              className={`relative flex flex-col items-center justify-center w-14 h-14 rounded-[2rem] transition-all duration-500 active:scale-75 group ${
-                isActive 
-                  ? 'text-prime-400' 
-                  : 'text-gray-500 hover:text-gray-300'
-              }`}
+  // --- Bottom Navigation (Ultra-Premium Dock) ---
+  const BottomNav = () => {
+    const activeIndex = navSlots.findIndex(item => activeTab === item.id || (item.id === 'menu' && isMobileMenuOpen));
+    
+    // Icon mapping helper
+    const getIcon = (id) => {
+      if (id === 'menu') return PanelLeft;
+      const found = mainNav.reduce((acc, item) => {
+        if (item.id === id) return item.icon;
+        if (item.sub) {
+          const sub = item.sub.find(s => s.id === id);
+          if (sub) return sub.icon;
+        }
+        return acc;
+      }, Activity);
+      return found;
+    };
+
+    const handleTriggerPicker = (e, index) => {
+      e.preventDefault();
+      if (index === 0) return; // Menu slot is fixed
+      setNavPicker({ isOpen: true, slotIndex: index });
+    };
+
+    const startLongPress = (index) => {
+      if (index === 0) return;
+      longPressTimer.current = setTimeout(() => {
+        setNavPicker({ isOpen: true, slotIndex: index });
+      }, 600);
+    };
+
+    const stopLongPress = () => {
+      if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    };
+
+    return (
+      <div className="lg:hidden fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-[420px] animate-in fade-in slide-in-from-bottom-12 duration-1000">
+        <div className={`relative flex items-center p-1.5 rounded-[3.5rem] border shadow-[0_40px_80px_-20px_rgba(0,0,0,0.8)] backdrop-blur-3xl ${
+          isDarkMode ? 'bg-[#0a0f1d]/80 border-white/10' : 'bg-white/90 border-black/5'
+        }`}>
+          {activeIndex !== -1 && (
+            <div 
+              className="absolute inset-y-1.5 bg-gradient-to-r from-prime-500 via-indigo-500 to-prime-600 rounded-[2.5rem] transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+              style={{ 
+                left: `${(activeIndex * 100) / navSlots.length}%`,
+                width: `${100 / navSlots.length}%`,
+                scale: 0.94
+              }}
             >
-              {/* Active High-Gloss Indicator Pill */}
-              {isActive && (
-                <div className="absolute inset-1 bg-prime-500/10 rounded-[1.5rem] border border-prime-500/20 shadow-[0_0_20px_rgba(139,92,246,0.1)] animate-in zoom-in-90 duration-500" />
-              )}
-              
-              <item.icon 
-                size={22} 
-                strokeWidth={isActive ? 2.5 : 2} 
-                className={`relative z-10 transition-all duration-700 ${isActive ? 'scale-110 drop-shadow-[0_0_8px_rgba(139,92,246,0.8)]' : 'group-hover:scale-110 opacity-60'}`} 
-              />
-              
-              {isActive && (
-                <div className="absolute -bottom-1 w-1.5 h-1.5 bg-prime-500 rounded-full shadow-[0_0_15px_rgba(139,92,246,1)] animate-pulse" />
-              )}
-            </button>
-          );
-        })}
+              <div className="absolute inset-0 bg-white/10 rounded-[2.5rem] border-t border-white/20" />
+            </div>
+          )}
+
+          {navSlots.map((item, index) => {
+            const isActive = activeIndex === index;
+            const Icon = getIcon(item.id);
+            return (
+              <button
+                key={`${item.id}-${index}`}
+                onClick={() => {
+                  if (item.id === 'menu') setIsMobileMenuOpen(!isMobileMenuOpen);
+                  else handleTabChange(item.id);
+                }}
+                onContextMenu={(e) => handleTriggerPicker(e, index)}
+                onTouchStart={() => startLongPress(index)}
+                onTouchEnd={stopLongPress}
+                className={`relative flex-1 flex flex-col items-center justify-center py-4 rounded-[2rem] transition-all duration-500 active:scale-90 group z-10`}
+              >
+                <div className={`relative p-2.5 rounded-[1rem] transition-all duration-500 shadow-lg border-t border-white/20 overflow-hidden ${
+                  isActive 
+                    ? 'bg-gradient-to-br from-white/20 to-white/5 opacity-100' 
+                    : 'bg-white/5 opacity-50 group-hover:opacity-100'
+                }`}>
+                   <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none" />
+                   <Icon
+                    size={22} 
+                    strokeWidth={2} 
+                    className={`transition-all duration-500 text-white relative z-10 ${
+                      isActive ? 'scale-110 drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]' : ''
+                    }`} 
+                   />
+                </div>
+                {isActive && (
+                  <div className="absolute -top-1 w-6 h-0.5 bg-white shadow-[0_0_10px_rgba(255,255,255,1)] rounded-full animate-pulse z-20" />
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  // --- Navigation Picker Popup ---
+  const NavigationPicker = () => {
+    if (!navPicker.isOpen) return null;
+    
+    // Pool of all available items
+    const availablePool = mainNav.reduce((acc, item) => {
+      acc.push({ id: item.id, label: item.label, icon: item.icon, group: 'Main Hubs' });
+      if (item.sub) {
+        item.sub.forEach(sub => {
+          acc.push({ id: sub.id, label: sub.label, icon: sub.icon, group: t(item.label) });
+        });
+      }
+      return acc;
+    }, []);
+
+    const handleSelect = (itemId) => {
+      const newSlots = [...navSlots];
+      newSlots[navPicker.slotIndex] = { id: itemId };
+      setNavSlots(newSlots);
+      setNavPicker({ isOpen: false, slotIndex: null });
+    };
+
+    return createPortal(
+      <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-8">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-xl animate-in fade-in duration-700" onClick={() => setNavPicker({ isOpen: false, slotIndex: null })} />
+        
+        <div className="relative w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col items-center gap-6 animate-in zoom-in-95 slide-in-from-bottom-10 duration-700">
+           {/* Floating Header */}
+           <div className={`p-6 px-10 rounded-[2.5rem] border backdrop-blur-3xl shadow-2xl transition-all duration-700 flex flex-col items-center ${
+            isDarkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-black/5 text-gray-900'
+           }`}>
+              <h3 className="text-2xl font-black tracking-tighter uppercase mb-1">Select Core Module</h3>
+              <p className="text-[9px] font-black uppercase tracking-[0.4em] opacity-40">Personalize Slot {navPicker.slotIndex}</p>
+           </div>
+          
+          <div className="w-full flex-1 overflow-y-auto px-4 pb-12 space-y-10 custom-scrollbar">
+            {/* Grouping Items into Floating Clusters */}
+            {['Main Hubs', t('social_suite'), t('products_offers'), t('data_engine')].map(group => (
+              <div key={group} className="space-y-4">
+                <div className="flex items-center justify-center gap-4">
+                  <div className="h-px w-10 bg-white/10" />
+                  <p className="text-[9px] font-black uppercase tracking-[0.5em] opacity-30 whitespace-nowrap text-prime-400">{group}</p>
+                  <div className="h-px w-10 bg-white/10" />
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-2 gap-3 md:gap-4">
+                  {availablePool.filter(p => (group === 'Main Hubs' ? p.group === 'Main Hubs' : p.group === group)).map(p => {
+                    const isAssigned = navSlots.some(s => s.id === p.id);
+                    return (
+                    <button
+                      key={p.id}
+                      onClick={() => handleSelect(p.id)}
+                      disabled={isAssigned}
+                      className={`group/opt relative flex items-center gap-4 p-4 rounded-[2rem] border transition-all duration-700 hover:scale-[1.05] hover:-translate-y-1 ${
+                        isDarkMode 
+                          ? `bg-white/[0.03] border-white/5 ${isAssigned ? 'opacity-20 grayscale cursor-not-allowed' : 'hover:border-prime-500/30'}` 
+                          : 'bg-white border-black/5 shadow-lg'
+                      }`}
+                    >
+                       <div className={`p-4 rounded-2xl transition-all duration-500 shadow-xl border-t border-white/10 ${
+                         isDarkMode ? 'bg-gradient-to-br from-prime-500/80 to-indigo-600/80 text-white' : 'bg-prime-50 text-prime-600'
+                       }`}>
+                         <p.icon size={22} strokeWidth={2.5} />
+                       </div>
+                       <div className="text-left">
+                         <span className={`block text-[10px] font-black uppercase tracking-widest ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                           {t(p.label)}
+                         </span>
+                         <span className="text-[7px] font-bold text-prime-400 opacity-60 uppercase tracking-[0.2em]">{p.group}</span>
+                       </div>
+                    </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Floating Close Button */}
+          <button 
+            onClick={() => setNavPicker({ isOpen: false, slotIndex: null })}
+            className="absolute bottom-4 p-5 bg-white text-black rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] active:scale-90 transition-all hover:scale-110 z-50 animate-bounce duration-[3000ms]"
+          >
+            <X size={24} strokeWidth={2.5} />
+          </button>
+        </div>
+      </div>,
+      document.body
+    );
+  };
 
   if (loading && !brandData) {
     return (
@@ -698,6 +900,17 @@ const Dashboard = () => {
             {activeTab === 'library' && <KnowledgeBase library={library} isDarkMode={isDarkMode} t={t} />}
             {activeTab === 'architect' && <BlueprintArchitect brandData={brandData} isDarkMode={isDarkMode} t={t} />}
             {activeTab === 'admin' && role === 'super-admin' && <SuperAdminPanel isDarkMode={isDarkMode} t={t} />}
+            
+            {/* Main Category Hubs */}
+            {activeMainCategory && (
+              <CategoryHub 
+                isDarkMode={isDarkMode} 
+                t={t} 
+                category={activeMainCategory} 
+                onSubSelect={handleTabChange} 
+                metrics={hubMetrics}
+              />
+            )}
           </div>
         </ErrorBoundary>
       </main>
@@ -755,6 +968,7 @@ const Dashboard = () => {
           />
         )}
         <BottomNav />
+        <NavigationPicker />
       </ErrorBoundary>
     </div>
   );

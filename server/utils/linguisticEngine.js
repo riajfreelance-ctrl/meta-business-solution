@@ -48,8 +48,16 @@ const noiseWords = [
   "koto", "hobe", "ase", "ache", "pabo", "nibo", "নিতে", "চাই", "ভাই", "আপু"
 ];
 
-const prefixes = ["", "bhai", "admin", "hey", "hello", "ji"];
-const suffixes = ["", "bolen", "den", "plz", "ache?", "pabo?", "koto"];
+const prefixes = [
+  "", "bhai", "admin", "hey", "hello", "ji", "apu", "aphu", "sister", "vai", "sir", "madam",
+  "assalamu alaikum", "slm", "hey bro", "hlw", "oi", "excuse me", "please", "can you", 
+  "ভাই", "আপু", "আসসালামু আলাইকুম", "শুনুন", "বলছি"
+];
+const suffixes = [
+  "", "bolen", "den", "plz", "ache?", "pabo?", "koto", "dekhai", "eita", "seta", 
+  "details", "details hobe?", "pic hobe?", "picture den", "lagbe", "nibo", "kinbo",
+  "জানান", "হবে?", "কত", "আছে?", "দেখি", "দেন", "পাবো?", "নিবো", "কিনবো"
+];
 
 const coreKeywordMap = {
   "Greeting": ["hi", "hello", "salam", "slm", "hey", "oi", "bro", "hlw", "আসসালামু আলাইকুম", "হাই", "হ্যালো"],
