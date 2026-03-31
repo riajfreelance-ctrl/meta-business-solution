@@ -170,16 +170,6 @@ app.get('/api/health/automation', async (req, res) => {
     }
 });
 
-app.get('/api/health/ai', async (req, res) => {
-    const { getDynamicModel } = require('./services/geminiService');
-    try {
-        const model = await getDynamicModel(process.env.GEMINI_API_KEY);
-        const result = await model.generateContent("Hi");
-        res.json({ success: true, response: result.response.text(), keyPrefix: (process.env.GEMINI_API_KEY || '').substring(0, 5) });
-    } catch (e) {
-        res.status(500).json({ error: e.message, keyPrefix: (process.env.GEMINI_API_KEY || '').substring(0, 5) });
-    }
-});
 // ─────────────────────────────────────────────────────────────────────
 
 app.use('/api', fbRoutes);
