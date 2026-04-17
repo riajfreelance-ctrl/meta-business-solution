@@ -4,6 +4,7 @@ import { ThemeToggle } from '../ThemeLanguageToggles';
 import { db } from '../../firebase-client';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { useBrand } from '../../context/BrandContext';
+import MetaConnectors from './MetaConnectors';
 
 const SettingsView = ({ isDarkMode, theme, setTheme, language, setLanguage, t }) => {
   const { activeBrandId, brandData, refreshBrandData } = useBrand();
@@ -292,7 +293,7 @@ const SettingsView = ({ isDarkMode, theme, setTheme, language, setLanguage, t })
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-2 mb-10">
               <div className="flex justify-between items-center">
                 <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest flex items-center gap-2">
                   Gemini API Key (Google AI)
@@ -314,69 +315,13 @@ const SettingsView = ({ isDarkMode, theme, setTheme, language, setLanguage, t })
               </p>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Facebook & Instagram IDs</label>
-                {sysConfig.facebook && !apiConfig.facebookPageId && (
-                  <span className="text-[8px] font-black bg-blue-500/10 text-blue-400 px-2 py-1 rounded-md uppercase tracking-tighter border border-blue-500/20">System Active</span>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="relative">
-                  <input 
-                    type="text"
-                    value={apiConfig.facebookPageId}
-                    onChange={(e) => setApiConfig({...apiConfig, facebookPageId: e.target.value})}
-                    placeholder="Page ID"
-                    className={`w-full p-4 rounded-xl border font-mono text-xs pl-12 ${isDarkMode ? 'bg-white/5 border-white/5 text-white' : 'bg-gray-50 border-black/5'}`}
-                  />
-                  <Facebook size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-500" />
-                </div>
-                <div className="relative">
-                  <input 
-                    type="text"
-                    value={apiConfig.instagramId}
-                    onChange={(e) => setApiConfig({...apiConfig, instagramId: e.target.value})}
-                    placeholder="IG Business ID"
-                    className={`w-full p-4 rounded-xl border font-mono text-xs pl-12 ${isDarkMode ? 'bg-white/5 border-white/5 text-white' : 'bg-gray-50 border-black/5'}`}
-                  />
-                  <Instagram size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-500" />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4 pt-4 border-t border-white/5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MessageCircle size={16} className="text-green-500" />
-                  <h5 className="text-[10px] font-black uppercase tracking-widest text-green-500">WhatsApp Cloud API</h5>
-                </div>
-                {sysConfig.whatsapp && !apiConfig.whatsappPhoneId && (
-                  <span className="text-[8px] font-black bg-blue-500/10 text-blue-400 px-2 py-1 rounded-md uppercase tracking-tighter border border-blue-500/20">System Active</span>
-                )}
-              </div>
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase text-gray-500 tracking-widest">Phone Number ID</label>
-                  <input 
-                    type="text"
-                    value={apiConfig.whatsappPhoneId}
-                    onChange={(e) => setApiConfig({...apiConfig, whatsappPhoneId: e.target.value})}
-                    placeholder="e.g. 1029384756..."
-                    className={`w-full p-3 rounded-xl border font-mono text-xs ${isDarkMode ? 'bg-white/5 border-white/5 text-white' : 'bg-gray-50 border-black/5'}`}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[8px] font-black uppercase text-gray-500 tracking-widest">WhatsApp Access Token</label>
-                  <textarea 
-                    value={apiConfig.waAccessToken}
-                    onChange={(e) => setApiConfig({...apiConfig, waAccessToken: e.target.value})}
-                    placeholder="Permanent Token"
-                    className={`w-full p-3 rounded-xl border font-mono text-[10px] h-16 resize-none ${isDarkMode ? 'bg-white/5 border-white/5 text-white' : 'bg-gray-50 border-black/5'}`}
-                  />
-                </div>
-              </div>
-            </div>
+            <MetaConnectors 
+              apiConfig={apiConfig}
+              setApiConfig={setApiConfig}
+              isDarkMode={isDarkMode}
+              t={t}
+              brandData={brandData}
+            />
 
             <div className="pt-6">
               <button 

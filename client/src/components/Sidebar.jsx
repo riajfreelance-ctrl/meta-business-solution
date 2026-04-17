@@ -16,7 +16,7 @@ const Tooltip = ({ text, show, top }) => {
   );
 };
 
-const SubmenuPopover = ({ item, show, t, handleTabChange, activeTab, top, onMouseEnter, onMouseLeave }) => {
+const SubmenuPopover = ({ item, show, t, handleTabChange, activeTab, top, onMouseEnter, onMouseLeave, expandedSubGroups, toggleSubGroup }) => {
   if (!show || !item.sub) return null;
   return (
     <div 
@@ -40,40 +40,57 @@ const SubmenuPopover = ({ item, show, t, handleTabChange, activeTab, top, onMous
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-prime-400 bg-prime-500/10 px-3 py-1.5 rounded-lg inline-block">{t(item.label)}</p>
           </div>
           <div className="space-y-4">
-            {/* Group by Category if it exists */}
-            {(() => {
-              const categories = [...new Set(item.sub.map(s => s.category || 'Other'))];
-              return categories.map(cat => (
-                <div key={cat} className="space-y-2">
-                  <div className="px-4 flex items-center gap-2">
-                    <div className="h-[1px] flex-1 bg-white/5" />
-                    <span className="text-[8px] font-black uppercase tracking-[.2em] text-gray-500">{cat}</span>
-                    <div className="h-[1px] flex-1 bg-white/5" />
-                  </div>
-                  <div className={`grid ${cat === 'All' ? 'grid-cols-1' : 'grid-cols-2'} gap-2 px-2`}>
-                    {item.sub.filter(s => (s.category || 'Other') === cat).map(sub => (
-                      <button
-                        key={sub.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleTabChange(sub.id);
-                        }}
-                        className={`group flex items-center justify-center flex-col gap-2 p-4 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all duration-300 border ${
-                          activeTab === sub.id 
-                            ? 'bg-gradient-to-br from-prime-600/20 to-purple-600/20 border-prime-500/50 text-white shadow-lg' 
-                            : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10 hover:text-white hover:-translate-y-0.5'
-                        }`}
-                      >
-                        <div className={`p-2 rounded-xl transition-all duration-500 ${activeTab === sub.id ? 'bg-prime-500 text-white scale-110 shadow-lg shadow-prime-500/50' : 'bg-white/5 text-prime-400/60 group-hover:bg-prime-500/20 group-hover:text-prime-400'}`}>
-                          {sub.icon && <sub.icon size={16} />}
-                        </div>
-                        <span className="text-center truncate w-full">{t(sub.label)}</span>
-                      </button>
-                    ))}
-                  </div>
+            {item.sub.map(sub => {
+              const isGroup = sub.isGroup;
+              const isExpanded = expandedSubGroups.includes(sub.id);
+              
+              return (
+                <div key={sub.id} className="space-y-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isGroup) toggleSubGroup(sub.id);
+                      else handleTabChange(sub.id);
+                    }}
+                    className={`w-full group flex items-center justify-between p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 border ${
+                      activeTab === sub.id || (isGroup && sub.items.some(i => i.id === activeTab))
+                        ? 'bg-gradient-to-br from-prime-600/10 to-purple-600/10 border-prime-500/30 text-white' 
+                        : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-xl transition-all duration-500 ${activeTab === sub.id ? 'bg-prime-500 text-white' : 'bg-white/5 text-prime-400/60'}`}>
+                        {sub.icon && <sub.icon size={16} />}
+                      </div>
+                      <span>{t(sub.label)}</span>
+                    </div>
+                    {isGroup && (
+                      <ChevronRight size={14} className={`transition-transform duration-300 ${isExpanded ? 'rotate-90' : 'opacity-30'}`} />
+                    )}
+                  </button>
+
+                  {isGroup && isExpanded && (
+                    <div className="ml-8 space-y-1 animate-in slide-in-from-left-2 duration-300">
+                      {sub.items.map(nested => (
+                        <button
+                          key={nested.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTabChange(nested.id);
+                          }}
+                          className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all ${
+                            activeTab === nested.id ? 'text-prime-400 bg-prime-500/5' : 'text-gray-500 hover:text-white'
+                          }`}
+                        >
+                          {nested.icon && <nested.icon size={12} />}
+                          {t(nested.label)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ));
-            })()}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -154,6 +171,13 @@ const Sidebar = ({
   const { brands, activeBrandId, setActiveBrandId, user, role, logout } = useBrand();
   const [popoverData, setPopoverData] = useState({ show: false, item: null, top: 0, type: null });
   const [isBrandSwitcherOpen, setIsBrandSwitcherOpen] = useState(false);
+  const [expandedSubGroups, setExpandedSubGroups] = useState([]);
+
+  const toggleSubGroup = (groupId) => {
+    setExpandedSubGroups(prev => 
+      prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]
+    );
+  };
 
   const toggleMenu = (menuId) => {
     if (isSidebarCollapsed) {
@@ -181,10 +205,17 @@ const Sidebar = ({
     } ${
       isFlat 
         ? 'm-0 rounded-none border-y-0 border-l-0 border-r shadow-none' 
-        : 'm-4 rounded-[2.5rem] border shadow-[0_25px_80px_-15px_rgba(0,0,0,0.5)]'
+        : 'm-6 lg:m-8 rounded-[3rem] border shadow-[0_40px_100px_-20px_rgba(0,0,0,0.7),0_0_20px_rgba(0,0,0,0.3)]'
     } ${
-      isDarkMode ? 'bg-[#020617]/80 border-white/5 backdrop-blur-3xl' : 'bg-white/90 border-black/5 backdrop-blur-xl'
+      isDarkMode 
+        ? 'bg-slate-950/40 border-white/[0.08] backdrop-blur-[40px]' 
+        : 'bg-white/60 border-black/[0.05] backdrop-blur-3xl'
     }`}>
+      
+      {/* Premium Glass Stroke Glow */}
+      {!isFlat && isDarkMode && (
+        <div className="absolute inset-0 rounded-[3rem] border border-white/10 pointer-events-none" />
+      )}
       
       {/* Scrollable Content Container */}
       <div className="flex-1 flex flex-col overflow-y-auto overflow-x-visible p-6 pb-32 lg:pb-6 scrollbar-thin relative z-10">
@@ -353,43 +384,56 @@ const Sidebar = ({
                 
                  {hasSub && isExpanded && !isSidebarCollapsed && (
                    <div className="ml-12 space-y-2 animate-in slide-in-from-top-4 duration-500 pr-2">
-                     {item.sub.map((subItem, subIndex) => {
-                       const isSubActive = activeTab === subItem.id;
+                     {item.sub.map((subItem) => {
+                       const isSubGroupActive = activeTab === subItem.id || (subItem.isGroup && subItem.items.some(i => i.id === activeTab));
+                       const isSubGroupExpanded = expandedSubGroups.includes(subItem.id);
+
                        return (
-                         <div 
-                           key={subItem.id}
-                           draggable
-                           onDragStart={(e) => {
-                             e.stopPropagation();
-                             handleDragStart(e, 'sub', index, subIndex);
-                           }}
-                           onDragOver={(e) => {
-                             e.stopPropagation();
-                             handleDragOver(e, 'sub', index, subIndex);
-                           }}
-                           onDragEnd={handleDragEnd}
-                           onDrop={handleDrop}
-                         >
+                         <div key={subItem.id} className="space-y-1">
                            <button
-                             onClick={() => handleTabChange(subItem.id)}
+                             onClick={() => {
+                               if (subItem.isGroup) toggleSubGroup(subItem.id);
+                               else handleTabChange(subItem.id);
+                             }}
                              className={`w-full flex items-center justify-between px-4 py-4 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all relative group/sub ${
-                               isSubActive 
+                               isSubGroupActive
                                  ? 'text-prime-400 bg-prime-500/5 shadow-[inset_0_0_20px_rgba(139,92,246,0.1)]'
                                  : 'text-gray-500 hover:text-white hover:translate-x-1'
                              }`}
                            >
                              <div className="flex items-center gap-3">
                                <div className={`p-2 rounded-xl transition-all duration-500 border-t border-white/10 ${
-                               isSubActive 
+                               activeTab === subItem.id 
                                  ? 'bg-gradient-to-br from-prime-400 to-prime-600 text-white shadow-lg' 
                                  : 'bg-white/5 text-gray-500 group-hover/sub:bg-white/10'
                              }`}>
-                               <subItem.icon size={18} strokeWidth={isSubActive ? 3 : 2} />
+                               {subItem.icon && <subItem.icon size={18} />}
                              </div>
                                <span className="truncate">{t(subItem.label)}</span>
                              </div>
-                             {isSubActive && <Activity size={10} className="text-prime-400 animate-pulse" />}
+                             {subItem.isGroup ? (
+                               <ChevronDown size={12} className={`transition-transform duration-300 ${isSubGroupExpanded ? 'rotate-180 text-prime-400' : 'opacity-20'}`} />
+                             ) : (
+                               activeTab === subItem.id && <Activity size={10} className="text-prime-400 animate-pulse" />
+                             )}
                            </button>
+
+                           {subItem.isGroup && isSubGroupExpanded && (
+                             <div className="ml-8 mt-1 space-y-1 animate-in slide-in-from-top-2 duration-300">
+                               {subItem.items.map(nested => (
+                                 <button
+                                   key={nested.id}
+                                   onClick={() => handleTabChange(nested.id)}
+                                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all ${
+                                     activeTab === nested.id ? 'text-white bg-prime-500 shadow-lg shadow-prime-500/20' : 'text-gray-500 hover:text-gray-400 hover:translate-x-1'
+                                   }`}
+                                 >
+                                   <div className={`w-1 h-1 rounded-full ${activeTab === nested.id ? 'bg-white' : 'bg-gray-700'}`} />
+                                   {t(nested.label)}
+                                 </button>
+                               ))}
+                             </div>
+                           )}
                          </div>
                        )})}
                    </div>
@@ -479,6 +523,8 @@ const Sidebar = ({
             top={popoverData.top} 
             onMouseEnter={() => setPopoverData(prev => ({ ...prev, show: true }))}
             onMouseLeave={() => setPopoverData(prev => ({ ...prev, show: false }))}
+            expandedSubGroups={expandedSubGroups}
+            toggleSubGroup={toggleSubGroup}
           />
         ) : (
           <Tooltip 

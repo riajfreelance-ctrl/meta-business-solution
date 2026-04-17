@@ -75,43 +75,40 @@ const CampaignWizard = ({ isDarkMode, t, activeBrandId }) => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className={`text-2xl font-black uppercase tracking-tight  flex items-center gap-3 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-            <Target className="text-prime-500" />
-            Meta Ads Growth Engine
+          <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-white flex items-center gap-4">
+            <Target className="text-prime-500 text-stroke-thin" size={40} />
+            Meta Ads <span className="text-prime-500 text-stroke-thin">Matrix</span>
           </h2>
-          <p className="text-xs opacity-50 font-bold uppercase tracking-widest mt-1">Agency-Free Data Driven Advertising</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-prime-500 mt-2 flex items-center gap-2">
+            <Zap size={12} /> Autonomous Audience Intelligence
+          </p>
         </div>
         <button 
           onClick={fetchAdAccounts}
-          className={`p-2 rounded-xl transition-all ${isDarkMode ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-100 hover:bg-gray-200'}`}
+          className="w-12 h-12 rounded-full glass-card flex items-center justify-center text-gray-500 hover:text-prime-500 hover:bg-prime-500/10 transition-all border-none"
         >
-          <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''}/>
+          <RefreshCw size={20} className={isLoading ? 'animate-spin' : ''}/>
         </button>
       </div>
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Step 1: Ad Account & Strategy */}
-        <div className={`p-6 rounded-[2rem] border transition-all ${
-          isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white border-black/5 shadow-xl shadow-slate-200'
-        }`}>
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-12 h-12 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-500 font-black">1</div>
-            <h3 className="font-black uppercase tracking-tight text-sm">Select Ad Account</h3>
+        <div className="glass-card p-8 group transition-all duration-700 relative overflow-hidden dark">
+          <div className="flex items-center gap-5 mb-8">
+            <div className="w-14 h-14 rounded-2xl bg-prime-500/20 border border-prime-500/30 flex items-center justify-center text-prime-400 font-black text-xl shadow-[0_0_20px_rgba(107,33,168,0.3)]">1</div>
+            <h3 className="font-black uppercase tracking-widest text-[10px] text-gray-400">Select Ad Account</h3>
           </div>
           
           <select 
             value={selectedAccount}
             onChange={(e) => setSelectedAccount(e.target.value)}
-            className={`w-full p-4 rounded-2xl border text-sm font-bold transition-all mb-4 ${
-              isDarkMode ? 'bg-white/5 border-white/10 text-white focus:border-prime-500/50' : 'bg-slate-50 border-black/5'
-            }`}
+            className="glass-input w-full p-4 rounded-2xl text-[11px] font-black uppercase tracking-widest mb-6"
           >
             {adAccounts.map(acc => (
-              <option key={acc.id} value={acc.id}>{acc.name} ({acc.account_id})</option>
+              <option key={acc.id} value={acc.id} className="bg-slate-900">{acc.name} ({acc.account_id})</option>
             ))}
-            {adAccounts.length === 0 && <option disabled>No Ad Accounts Found</option>}
+            {adAccounts.length === 0 && <option disabled>Scanning Accounts...</option>}
           </select>
 
           <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-prime-500/5 border-prime-500/10' : 'bg-prime-50 border-prime-500/20'}`}>
@@ -206,25 +203,28 @@ const CampaignWizard = ({ isDarkMode, t, activeBrandId }) => {
       </div>
 
       {/* Live Performance Snapshot */}
-      <div className={`p-8 rounded-[2.5rem] border ${
-        isDarkMode ? 'bg-slate-900/50 border-white/5' : 'bg-white border-black/5 shadow-xl'
-      }`}>
-        <div className="flex items-center gap-2 mb-8">
-           <BarChart3 size={18} className="text-prime-500" />
-           <h3 className="text-xs font-black uppercase tracking-widest opacity-50">ROI Analytics Pipeline</h3>
+      <div className="glass-card p-10 relative overflow-hidden dark">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-prime-500/5 blur-[100px] rounded-full -mr-32 -mt-32" />
+        
+        <div className="flex items-center gap-3 mb-10 relative z-10">
+           <BarChart3 size={16} className="text-prime-500" />
+           <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-500">ROI Analytics Pipeline</h3>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-12 relative z-10">
           {[
-            { label: 'Ad Spend', value: '45,000', unit: 'BDT', color: 'text-blue-500' },
-            { label: 'New Leads', value: '1,240', unit: 'Leads', color: 'text-purple-500' },
-            { label: 'Conv. Rate', value: '8.4', unit: '%', color: 'text-prime-500' },
-            { label: 'Est. Revenue', value: '3,20,000', unit: 'BDT', color: 'text-green-500' }
+            { label: 'Total Ad Spend', value: '45,200', unit: 'BDT', color: 'text-white' },
+            { label: 'Attributed Leads', value: '1,240', unit: 'Leads', color: 'text-prime-400' },
+            { label: 'Conversion Rate', value: '8.4', unit: '%', color: 'text-green-400' },
+            { label: 'Projected Revenue', value: '3,20,000', unit: 'BDT', color: 'text-prime-500' }
           ].map((stat, i) => (
-            <div key={i} className="text-center md:text-left">
-              <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-2">{stat.label}</p>
-              <div className="flex items-baseline gap-1 justify-center md:justify-start">
-                <span className={`text-3xl font-black ${stat.color}`}>{stat.value}</span>
-                <span className="text-[10px] font-bold opacity-50">{stat.unit}</span>
+            <div key={i} className="flex flex-col gap-2">
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-500">{stat.label}</p>
+              <div className="flex items-baseline gap-2">
+                <span className={`text-4xl font-black tracking-tighter ${stat.color}`}>{stat.value}</span>
+                <span className="text-[10px] font-black opacity-30 uppercase tracking-widest">{stat.unit}</span>
+              </div>
+              <div className="w-12 h-1 bg-white/5 rounded-full mt-2 overflow-hidden">
+                <div className="h-full bg-prime-500/40 w-2/3" />
               </div>
             </div>
           ))}

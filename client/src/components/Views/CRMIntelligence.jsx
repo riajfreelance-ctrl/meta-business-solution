@@ -50,98 +50,102 @@ const CRMIntelligence = ({ isDarkMode, t }) => {
 
   return (
     <div className="flex flex-col h-full space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h2 className={`text-2xl font-black uppercase tracking-tight  flex items-center gap-3 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-            <Users className="text-prime-500" size={28} />
-            CRM Intelligence
+          <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-white flex items-center gap-4">
+            <Users className="text-prime-500 text-stroke-thin" size={40} />
+            CRM <span className="text-prime-500 text-stroke-thin">Intelligence</span>
           </h2>
-          <p className="text-xs opacity-50 font-bold uppercase tracking-widest mt-1">AI-Powered Customer Profiling</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-prime-500 mt-2 flex items-center gap-2">
+            <Zap size={12} /> Real-time Behavioral Profiling
+          </p>
         </div>
         <button
           onClick={handleRunSegmentation}
           disabled={isSegmenting}
-          className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${
-            isSegmenting ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed' : 'bg-prime-500 text-white shadow-lg shadow-prime-500/30 hover:scale-[1.02]'
-          }`}
+          className="px-8 py-4 rounded-2xl bg-prime-500 text-white font-black uppercase text-xs tracking-widest transition-all shadow-xl shadow-prime-500/20 hover:bg-prime-600 active:scale-95 disabled:opacity-50"
         >
-          {isSegmenting ? <RefreshCw size={16} className="animate-spin"/> : <Zap size={16}/>}
-          {isSegmenting ? 'Segmenting...' : 'Run AI Segment'}
+          <div className="flex items-center gap-2">
+            {isSegmenting ? <RefreshCw size={16} className="animate-spin"/> : <Zap size={16}/>}
+            {isSegmenting ? 'Segmenting...' : 'Sync AI Intelligence'}
+          </div>
         </button>
       </div>
 
-      {/* Segment Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
         {Object.entries(SEGMENT_CONFIG).map(([seg, cfg]) => {
           const Icon = cfg.icon;
           return (
             <button
               key={seg}
               onClick={() => setFilter(filter === seg ? 'all' : seg)}
-              className={`p-5 rounded-[1.5rem] border text-left transition-all hover:scale-[1.02] ${cfg.bg} ${cfg.border} ${
-                filter === seg ? 'ring-2 ring-prime-500' : ''
+              className={`glass-card p-6 text-left transition-all hover:-translate-y-1 relative overflow-hidden group ${
+                filter === seg ? 'ring-2 ring-prime-500 scale-105' : ''
               }`}
             >
-              <div className="flex justify-between items-start mb-4">
-                <Icon size={20} className={cfg.color} />
-                <span className={`text-3xl font-black ${cfg.color}`}>{stats[seg] || 0}</span>
+              <div className={`absolute -bottom-4 -right-4 w-16 h-16 blur-2xl opacity-10 group-hover:opacity-30 transition-all ${cfg.bg}`} />
+              
+              <div className="flex justify-between items-start mb-6 relative z-10">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center border border-white/5 ${cfg.bg}`}>
+                  <Icon size={18} className={cfg.color} />
+                </div>
+                <span className={`text-4xl font-black tracking-tighter ${cfg.color}`}>{stats[seg] || 0}</span>
               </div>
-              <p className="text-[10px] font-black uppercase tracking-widest opacity-60">{seg}</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-500 relative z-10">{seg}</p>
             </button>
           );
         })}
       </div>
 
-      {/* Customer Table */}
-      <div className={`flex-1 rounded-[2rem] border overflow-hidden ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white border-black/5 shadow-xl shadow-slate-200'}`}>
-        <div className={`px-6 py-4 border-b flex items-center justify-between ${isDarkMode ? 'border-white/10' : 'border-black/5'}`}>
-          <h3 className="text-xs font-black uppercase tracking-widest opacity-60">Customer Profiles</h3>
-          <span className="text-[10px] font-black opacity-40">{filtered.length} records</span>
+      <div className="glass-card flex-1 overflow-hidden dark">
+        <div className="px-8 py-6 border-b border-white/5 flex items-center justify-between">
+          <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Customer Matrix Feed</h3>
+          <span className="text-[10px] font-black text-prime-500 animate-pulse">{filtered.length} ACTIVE PROFILES</span>
         </div>
-        <div className="overflow-y-auto max-h-[400px]">
+        <div className="overflow-y-auto max-h-[500px] scrollbar-thin">
           {filtered.map(c => (
-            <div key={c.id} className={`flex items-center gap-4 px-6 py-4 border-b transition-all hover:bg-white/5 ${isDarkMode ? 'border-white/5' : 'border-black/3'}`}>
-              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm ${
-                isDarkMode ? 'bg-white/10 text-gray-300' : 'bg-gray-100 text-gray-700'
-              }`}>
+            <div key={c.id} className="flex items-center gap-6 px-8 py-6 border-b border-white/5 transition-all hover:bg-white/[0.02] group">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 flex items-center justify-center font-black text-lg text-white shadow-xl transition-all group-hover:border-prime-500/30 group-hover:scale-105">
                 {(c.name || c.id || '?')[0].toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-black text-sm truncate">{c.name || c.id}</p>
-                <p className="text-[10px] opacity-50">{c.lastMessage?.substring(0, 60) || '—'}…</p>
+                <div className="flex items-center gap-3 mb-1">
+                  <p className="font-black text-lg tracking-tight text-white group-hover:text-prime-400 transition-colors uppercase">{c.name || c.id}</p>
+                  <div className="h-0.5 w-4 bg-white/10 rounded-full" />
+                </div>
+                <p className="text-[11px] font-bold text-gray-500 tracking-wide">{c.lastMessage?.substring(0, 70) || 'Initialized passive connection...'}…</p>
               </div>
-              <div className="flex items-center gap-2 flex-wrap justify-end">
+              <div className="flex items-center gap-3 flex-wrap justify-end">
                 {c.location && (
-                  <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 text-[9px] font-black uppercase">
-                    <MapPin size={10}/> {c.location}
-                  </span>
-                )}
-                {c.ageRange && (
-                  <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-400 text-[9px] font-black uppercase">
-                    <Calendar size={10}/> {c.ageRange}
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/5 text-blue-400 text-[9px] font-black uppercase tracking-widest shadow-lg">
+                    <MapPin size={10} className="text-blue-500" /> {c.location}
                   </span>
                 )}
                 {c.segment && (() => {
                   const cfg = SEGMENT_CONFIG[c.segment] || {};
                   return (
-                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${cfg.bg} ${cfg.color}`}>
+                    <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(0,0,0,0.5)] border border-white/5 ${cfg.bg} ${cfg.color}`}>
                       {c.segment}
                     </span>
                   );
                 })()}
                 {c.leadScore !== undefined && (
-                  <span className="px-2.5 py-1 rounded-full bg-prime-500/10 text-prime-400 text-[9px] font-black">
-                    {c.leadScore}/100
-                  </span>
+                  <div className="relative w-12 h-12 rounded-full border border-prime-500/20 flex items-center justify-center">
+                    <div className="absolute inset-0 rounded-full border-t-2 border-prime-500 animate-spin-slow opacity-30" />
+                    <span className="text-[10px] font-black text-white">
+                      {c.leadScore}
+                    </span>
+                  </div>
                 )}
               </div>
             </div>
           ))}
           {filtered.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 opacity-30">
-              <Users size={48} className="mb-4"/>
-              <p className="font-black uppercase text-xs">No customers yet</p>
+            <div className="flex flex-col items-center justify-center py-24 opacity-20">
+              <div className="w-20 h-20 rounded-full bg-prime-500/10 flex items-center justify-center mb-6">
+                <Users size={40} className="text-prime-500" strokeWidth={1} />
+              </div>
+              <p className="font-black uppercase tracking-[0.4em] text-xs">Awaiting Synaptic Input</p>
             </div>
           )}
         </div>

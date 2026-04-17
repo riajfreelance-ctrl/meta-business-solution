@@ -159,49 +159,67 @@ const ChatWindow = ({
     <div className={`flex-1 flex flex-col overflow-hidden relative glass transition-all duration-700 ${isDarkMode ? 'bg-[#020617]/20' : 'bg-gray-50/50'}`}>
       {selectedConvo ? (
         <>
-          <div className={`p-4 border-b flex items-center justify-between backdrop-blur-3xl sticky top-0 z-20 ${isDarkMode ? 'bg-[#020617]/40 border-white/10' : 'bg-white/60 border-black/5'}`}>
-            <div className="flex items-center gap-3">
+          <div className={`p-4 md:p-6 border-b flex items-center justify-between sticky top-0 z-30 transition-all duration-500 ${
+            isDarkMode ? 'bg-[#020617]/40 border-white/5 backdrop-blur-3xl shadow-2xl' : 'bg-white/60 border-black/5 backdrop-blur-3xl shadow-lg'
+          }`}>
+            <div className="flex items-center gap-4">
               {onBack && (
-                <button onClick={onBack} className="lg:hidden p-2 rounded-xl text-gray-500 hover:bg-gray-500/10">
-                  <ChevronRight size={24} className="rotate-180" />
+                <button onClick={onBack} className="lg:hidden p-2.5 rounded-2xl text-gray-400 hover:bg-white/5 transition-all">
+                  <ChevronLeft size={24} />
                 </button>
               )}
-              <div className="w-10 h-10 rounded-full bg-prime-500/20 flex items-center justify-center text-prime-500 font-bold">
-                {selectedConvo.customerName?.[0]}
+              <div className="relative">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-prime-500 to-indigo-600 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-prime-500/20">
+                  {selectedConvo.customerName?.[0]}
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-green-500 border-2 border-[#020617] animate-pulse"></div>
               </div>
               <div>
-                <p className="font-bold text-sm">{selectedConvo.customerName}</p>
-                <div className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                  <span className="text-[10px] opacity-50 uppercase tracking-widest font-bold">Messenger</span>
+                <h4 className={`font-black text-lg tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{selectedConvo.customerName}</h4>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-[9px] font-black uppercase tracking-widest ${
+                    selectedConvo.platform === 'instagram' ? 'bg-pink-500/10 text-pink-500 border-pink-500/10' :
+                    selectedConvo.platform === 'whatsapp' ? 'bg-green-500/10 text-green-500 border-green-500/10' :
+                    'bg-blue-500/10 text-blue-500 border-blue-500/10'
+                  }`}>
+                    {selectedConvo.platform === 'instagram' ? <Instagram size={10} strokeWidth={3} /> :
+                     selectedConvo.platform === 'whatsapp' ? <MessageCircle size={10} strokeWidth={3} /> :
+                     <Facebook size={10} fill="currentColor" strokeWidth={0} />}
+                    {selectedConvo.platform === 'instagram' ? 'Instagram' : selectedConvo.platform === 'whatsapp' ? 'WhatsApp' : 'Messenger'}
+                  </div>
                 </div>
               </div>
             </div>
+            
             <div className="flex items-center gap-2">
-              <button onClick={() => syncHistory(selectedConvo.id)} disabled={isSyncingHistory} className={`p-2 rounded-xl transition-all flex items-center gap-2 ${isSyncingHistory ? 'opacity-50 cursor-not-allowed' : 'text-prime-500 hover:bg-prime-500/10'}`} title="Sync History">
-                <RotateCcw size={18} className={isSyncingHistory ? 'animate-spin' : ''} />
-                <span className="text-[10px] font-bold uppercase tracking-widest hidden sm:inline">Sync</span>
+              <button 
+                onClick={() => syncHistory(selectedConvo.id)} 
+                disabled={isSyncingHistory} 
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all font-black text-[10px] uppercase tracking-widest ${
+                  isSyncingHistory ? 'opacity-50 cursor-not-allowed' : 'text-prime-400 hover:bg-prime-500/10 border border-prime-500/5 hover:border-prime-500/20'
+                }`}
+              >
+                <RotateCcw size={14} className={isSyncingHistory ? 'animate-spin' : ''} />
+                <span className="hidden sm:inline">Refresh Logic</span>
               </button>
-              {selectedConvo.isAdReply && (
-                <div className={`px-2 py-1 rounded-lg flex items-center gap-1.5 border ${isDarkMode ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-blue-50 border-blue-500/20 text-blue-600'}`}>
-                  <AlertCircle size={12} />
-                  <span className="text-[10px] font-black uppercase">{t('ad_source')}</span>
-                </div>
-              )}
-              <button onClick={onOpenOrderDrafting} className={`p-2 rounded-xl transition-all flex items-center gap-2 ${isDarkMode ? 'bg-prime-500/10 text-prime-400 hover:bg-prime-500/20' : 'bg-prime-50 text-prime-600 hover:bg-prime-100'}`}>
-                <ShoppingBag size={20} />
-                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Draft Order</span>
-              </button>
-              <button onClick={onOpenCatalogShare} className={`p-2 rounded-xl transition-all flex items-center gap-2 ${isDarkMode ? 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'}`}>
-                <Package size={20} />
-                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Catalog</span>
-              </button>
-              <button onClick={() => toggleFollowUp(selectedConvo.id)} className={`p-2 rounded-xl transition-all ${selectedConvo.isFollowUp ? 'bg-prime-500/10 text-prime-500' : 'text-gray-400 hover:bg-white/5'}`}>
-                <Bookmark size={20} className={selectedConvo.isFollowUp ? 'fill-prime-500' : ''} />
-              </button>
-              <button onClick={() => togglePriority(selectedConvo.id)} className={`p-2 rounded-xl transition-all ${selectedConvo.isPriority ? 'bg-amber-500/10 text-amber-500' : 'text-gray-400 hover:bg-white/5'}`}>
-                <Star size={20} className={selectedConvo.isPriority ? 'fill-amber-500' : ''} />
-              </button>
+
+              <div className="flex items-center bg-white/5 p-1 rounded-2xl border border-white/5">
+                <button onClick={onOpenOrderDrafting} className="p-2.5 rounded-xl transition-all text-prime-400 hover:bg-prime-500/10" title="Draft Order">
+                  <ShoppingBag size={20} />
+                </button>
+                <button onClick={onOpenCatalogShare} className="p-2.5 rounded-xl transition-all text-amber-500 hover:bg-amber-500/10" title="Catalog Manager">
+                  <Package size={20} />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1 ml-2">
+                <button onClick={() => toggleFollowUp(selectedConvo.id)} className={`p-2.5 rounded-xl transition-all ${selectedConvo.isFollowUp ? 'bg-prime-500/10 text-prime-400 shadow-[0_0_15px_rgba(14,165,233,0.1)]' : 'text-gray-500 hover:text-white'}`}>
+                  <Bookmark size={20} className={selectedConvo.isFollowUp ? 'fill-prime-500' : ''} />
+                </button>
+                <button onClick={() => togglePriority(selectedConvo.id)} className={`p-2.5 rounded-xl transition-all ${selectedConvo.isPriority ? 'bg-amber-500/10 text-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.1)]' : 'text-gray-500 hover:text-white'}`}>
+                  <Star size={20} className={selectedConvo.isPriority ? 'fill-amber-500' : ''} />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -213,92 +231,79 @@ const ChatWindow = ({
               </div>
             )}
 
-            {[...(chatMessages || []), ...optimisticMessages].filter(Boolean).map((msg, i) => (
-              <div
-                key={msg.id || i}
-                className={`group flex flex-col gap-1 ${msg.type === 'sent' ? 'items-end' : 'items-start max-w-[80%]'}`}
-                onDoubleClick={() => !msg.isOptimistic && !msg.isDeleted && setReplyTo && setReplyTo(msg)}
-                onContextMenu={(e) => !msg.isOptimistic && !msg.isDeleted && handleContextMenu(e, msg)}
-                onTouchStart={(e) => !msg.isOptimistic && !msg.isDeleted && handleTouchStart(e, msg)}
-                onTouchEnd={(e) => !msg.isOptimistic && !msg.isDeleted && handleTouchEnd(e, msg)}
-              >
-                {!msg.isDeleted && !msg.isOptimistic && (
-                  <div className={`flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mb-0.5 ${msg.type === 'sent' ? 'flex-row-reverse' : ''}`}>
-                    {handleDeleteMessage && msg.type === 'sent' && (
-                      <button onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }} className="p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-red-400">
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                    {msg.type === 'sent' && startEditMessage && (
-                      <button onClick={(e) => { e.stopPropagation(); startEditMessage(msg); }} className="p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-amber-400">
-                        <Edit2 size={14} />
-                      </button>
-                    )}
-                    {onForward && (
-                      <button onClick={(e) => { e.stopPropagation(); onForward(msg); }} className="p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-blue-400">
-                        <Forward size={14} />
-                      </button>
-                    )}
-                    {setReplyTo && (
-                      <button onClick={(e) => { e.stopPropagation(); setReplyTo(msg); }} className="p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-prime-400">
+            {[...(chatMessages || []), ...optimisticMessages].filter(Boolean).map((msg, i) => {
+              const isSent = msg.type === 'sent';
+              return (
+                <div
+                  key={msg.id || i}
+                  className={`group flex flex-col gap-1.5 ${isSent ? 'items-end' : 'items-start max-w-[85%] sm:max-w-[70%]'}`}
+                >
+                  {!msg.isDeleted && !msg.isOptimistic && (
+                    <div className={`flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 mb-0.5 ${isSent ? 'flex-row-reverse' : ''}`}>
+                      <button onClick={() => setReplyTo && setReplyTo(msg)} className="p-1.5 rounded-xl hover:bg-white/5 text-gray-500 hover:text-prime-400">
                         <CornerUpLeft size={14} />
                       </button>
-                    )}
-                  </div>
-                )}
-                <div className={`p-4 rounded-[1.8rem] text-sm transition-all duration-300 hover:shadow-2xl relative group/bubble ${
-                  msg.isDeleted ? ' opacity-40 border border-dashed border-gray-500' :
-                  msg.type === 'sent'
-                    ? (isDarkMode 
-                        ? 'bg-gradient-to-br from-prime-500 via-prime-600 to-indigo-600 text-white shadow-lg shadow-prime-500/20' 
-                        : 'bg-gradient-to-br from-prime-600 to-prime-700 text-white shadow-lg')
-                    : (isDarkMode 
-                        ? 'bg-white/[0.03] text-white border border-white/10 backdrop-blur-xl hover:bg-white/[0.06]' 
-                        : 'bg-white text-gray-900 border border-black/5 shadow-sm hover:shadow-md')
-                } ${msg.isOptimistic ? 'opacity-60 scale-[0.98]' : ''}`}>
-                  {msg.replyTo && (
-                    <div className="mb-3 p-3 rounded-2xl bg-black/20 border-l-4 border-prime-400 text-[10px] opacity-80 backdrop-blur-md  flex flex-col gap-1">
-                      <span className="font-black uppercase tracking-widest opacity-40 text-[8px]">Replying to</span>
-                      <span className="truncate">{msg.replyTo.text || 'Image Attachment'}</span>
+                      {isSent && (
+                        <>
+                          <button onClick={() => startEditMessage && startEditMessage(msg)} className="p-1.5 rounded-xl hover:bg-white/5 text-gray-500 hover:text-amber-400">
+                            <Edit2 size={14} />
+                          </button>
+                          <button onClick={() => handleDeleteMessage && handleDeleteMessage(msg.id)} className="p-1.5 rounded-xl hover:bg-white/5 text-gray-500 hover:text-red-400">
+                            <Trash2 size={14} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   )}
-                  {msg.isDeleted ? (
-                    <div className="flex items-center gap-2"><XCircle size={14} /> Unsent message</div>
-                  ) : msg.productCard ? (
-                    <ProductCard product={msg.productCard} />
-                  ) : (
-                    <>
-                      {msg.text || msg.message}
-                      {msg.attachments && msg.attachments.length > 0 && (
-                        <div className={`mt-3 rounded-2xl overflow-hidden border border-white/10 bg-black/5 ${
-                          msg.attachments.filter(Boolean).filter(a => a?.type === 'image' || typeof a === 'string').length === 1 ? 'max-w-[260px]' : 'grid grid-cols-2 gap-0.5 w-[260px]'
-                        }`}>
-                          {msg.attachments.filter(Boolean).filter(a => a?.type === 'image' || typeof a === 'string').slice(0, 4).map((att, attIdx, arr) => {
-                            const imgUrl = typeof att === 'string' ? att : (att.payload?.url || att.url);
-                            return (
-                              <div key={attIdx} className="relative overflow-hidden aspect-square">
-                                <img
-                                  src={imgUrl}
-                                  alt="Attachment"
-                                  className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-all"
-                                  onClick={() => setLightbox && setLightbox({ isOpen: true, images: arr, index: attIdx, zoom: 1 })}
-                                />
-                                {attIdx === 3 && arr.length > 4 && (
-                                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white font-black text-lg cursor-pointer">
-                                    +{arr.length - 3}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </>
-                  )}
+
+                  <div className={`relative px-5 py-4 rounded-[2rem] text-sm leading-relaxed transition-all duration-500 group-hover:shadow-2xl ${
+                    msg.isDeleted ? 'opacity-30 border border-dashed border-gray-600' :
+                    isSent
+                      ? 'bg-gradient-to-br from-prime-500 via-prime-600 to-indigo-600 text-white shadow-xl shadow-prime-500/10 border border-white/10'
+                      : (isDarkMode 
+                          ? 'bg-white/5 text-gray-100 border border-white/5 backdrop-blur-xl hover:bg-white/10' 
+                          : 'bg-white text-gray-800 border border-black/5 shadow-sm hover:shadow-md')
+                  } ${msg.isOptimistic ? 'opacity-50 animate-pulse' : ''} ${
+                    isSent ? 'rounded-tr-lg' : 'rounded-tl-lg'
+                  }`}>
+                    {msg.replyTo && (
+                      <div className="mb-3 p-3 rounded-2xl bg-black/20 border-l-4 border-prime-500 flex flex-col gap-0.5 opacity-80 backdrop-blur-md">
+                        <span className="text-[8px] font-black uppercase tracking-widest opacity-40">Reference Logic</span>
+                        <span className="text-[10px] font-bold truncate italic leading-tight">{msg.replyTo.text || 'Embedded Content'}</span>
+                      </div>
+                    )}
+
+                    {msg.isDeleted ? (
+                      <div className="flex items-center gap-2 italic text-xs"><XCircle size={14} className="opacity-50" /> Message Transmission Cancelled</div>
+                    ) : msg.productCard ? (
+                      <ProductCard product={msg.productCard} />
+                    ) : (
+                      <div className="font-medium whitespace-pre-wrap">{msg.text || msg.message}</div>
+                    )}
+
+                    {msg.attachments?.filter(Boolean).length > 0 && (
+                      <div className={`mt-3 rounded-2xl overflow-hidden border border-white/5 bg-black/20 ${
+                        msg.attachments.length === 1 ? 'max-w-[300px]' : 'grid grid-cols-2 gap-1 w-[260px]'
+                      }`}>
+                        {msg.attachments.slice(0, 4).map((att, attIdx, arr) => {
+                          const imgUrl = typeof att === 'string' ? att : (att.payload?.url || att.url);
+                          return (
+                            <img
+                              key={attIdx}
+                              src={imgUrl}
+                              alt="Inbound Asset"
+                              className="w-full h-full object-cover cursor-zoom-in hover:brightness-110 transition-all origin-center"
+                              onClick={() => setLightbox && setLightbox({ isOpen: true, images: arr, index: attIdx, zoom: 1 })}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-widest opacity-20 px-2">{msg.time || 'Sending...'}</span>
                 </div>
-                <span className="text-[10px] opacity-30 ml-2">{msg.time || '...'}</span>
-              </div>
-            ))}
+              );
+            })}
 
             <div ref={chatEndRef} />
             {showScrollButton && (
@@ -345,15 +350,56 @@ const ChatWindow = ({
             )}
 
             {showMacros && filteredMacros.length > 0 && (
-              <div ref={macroMenuRef} className={`absolute bottom-full left-4 right-4 mb-2 max-h-[240px] overflow-y-auto rounded-2xl border backdrop-blur-3xl shadow-2xl z-50 ${isDarkMode ? 'bg-[#1e1b4b]/90 border-white/10' : 'bg-white/95 border-black/5'}`}>
-                {filteredMacros.map((macro, idx) => (
-                  <button key={macro.id || idx} onClick={() => selectMacro(macro)} onMouseEnter={() => setSelectedMacroIdx(idx)} className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-all text-sm ${selectedMacroIdx === idx ? 'bg-prime-500/20' : 'opacity-70'}`}>
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-wider">{macro.keyword}</p>
-                      <p className="text-xs truncate opacity-60">{macro.result}</p>
-                    </div>
-                  </button>
-                ))}
+              <div ref={macroMenuRef} className={`absolute bottom-[calc(100%+12px)] left-4 right-4 rounded-[2.5rem] border backdrop-blur-3xl shadow-[0_32px_80px_rgba(0,0,0,0.8)] z-50 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out border-white/10 ${
+                isDarkMode ? 'bg-[#0f172a]/95' : 'bg-white/95 border-black/5'
+              }`}>
+                <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-white/5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-prime-500 animate-pulse shadow-[0_0_8px_rgba(14,165,233,0.8)]" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-prime-400">Speed Type Execution</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="px-2 py-1 text-[8px] font-black uppercase tracking-widest border border-white/10 rounded-lg bg-black/20 opacity-40">Nav ↑↓</span>
+                    <span className="px-2 py-1 text-[8px] font-black uppercase tracking-widest border border-white/10 rounded-lg bg-black/20 opacity-40">Execute ↵</span>
+                  </div>
+                </div>
+                <div className="max-h-[280px] overflow-y-auto scrollbar-thin">
+                  {filteredMacros.map((macro, idx) => {
+                    const isSelected = selectedMacroIdx === idx;
+                    return (
+                      <button 
+                        key={macro.id || idx} 
+                        onClick={() => selectMacro(macro)} 
+                        onMouseEnter={() => setSelectedMacroIdx(idx)} 
+                        className={`w-full text-left px-6 py-4 flex items-center gap-5 transition-all duration-300 relative group/macro ${
+                          isSelected ? 'bg-prime-500/10' : 'hover:bg-white/5 opacity-60'
+                        }`}
+                      >
+                        {isSelected && (
+                          <div className="absolute left-0 top-3 bottom-3 w-1 bg-prime-500 rounded-r-full shadow-[0_0_15px_rgba(14,165,233,1)]" />
+                        )}
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-black text-sm border transition-all ${
+                          isSelected ? 'bg-prime-500 border-prime-400 shadow-[0_0_20px_rgba(14,165,233,0.3)] text-white' : 'bg-white/5 border-white/5 text-gray-500'
+                        }`}>
+                          /{macro.keyword?.[0]?.toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-[11px] font-black uppercase tracking-widest mb-1 ${isSelected ? 'text-white' : 'text-gray-400'}`}>
+                            {macro.keyword}
+                          </p>
+                          <p className={`text-xs truncate font-medium ${isSelected ? 'text-gray-300' : 'text-gray-500'}`}>
+                            {macro.result}
+                          </p>
+                        </div>
+                        {isSelected && (
+                          <div className="px-3 py-1 rounded-lg border border-prime-500/30 text-[8px] font-black text-prime-400 uppercase tracking-widest animate-pulse">
+                            Ready
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
@@ -378,33 +424,41 @@ const ChatWindow = ({
                 </div>
               )}
 
-              <div className={`flex items-end gap-3 p-2 rounded-2xl border transition-all ${isDarkMode ? 'bg-white/5 border-white/10 focus-within:border-prime-500/50' : 'bg-gray-100 border-black/5 focus-within:border-prime-500/50'}`}>
-                <label className="p-2 cursor-pointer hover:bg-prime-500/10 rounded-xl transition-all">
-                  <Plus size={20} />
+              <div className={`flex items-end gap-3 p-3 rounded-[2rem] border transition-all duration-500 shadow-inner ${
+                isDarkMode ? 'bg-black/40 border-white/10 focus-within:border-prime-500/50 focus-within:shadow-[0_0_20px_rgba(14,165,233,0.05)]' : 'bg-gray-100 border-black/5 focus-within:border-prime-500/50'
+              }`}>
+                <label className="p-2.5 cursor-pointer hover:bg-prime-500/10 rounded-xl transition-all text-gray-500 hover:text-prime-400">
+                  <Plus size={20} strokeWidth={3} />
                   <input type="file" multiple className="hidden" onChange={handleFileChange} />
                 </label>
-                <CannedResponsePanel
-                  drafts={drafts}
-                  isDarkMode={isDarkMode}
-                  brandId={brandId}
-                  onSelect={(draft) => {
-                    setMessageInput((prev) => (prev ? prev + ' ' + draft.result : draft.result));
-                  }}
-                />
+                <div className="mb-0.5">
+                  <CannedResponsePanel
+                    drafts={drafts}
+                    isDarkMode={isDarkMode}
+                    brandId={brandId}
+                    onSelect={(draft) => {
+                      setMessageInput((prev) => (prev ? prev + ' ' + draft.result : draft.result));
+                    }}
+                  />
+                </div>
                 <textarea
                   value={messageInput}
                   onChange={handleInputChange}
-                  placeholder="Type '/' for macros..."
+                  placeholder="Type '/' for macros or message..."
                   rows={Math.max(1, Math.min(messageInput.split('\n').length, 8))}
-                  className="flex-1 bg-transparent border-none outline-none px-2 py-3 text-sm resize-none"
+                  className="flex-1 bg-transparent border-none outline-none px-2 py-3 text-[13px] font-medium resize-none placeholder:text-gray-600 dark:text-gray-100"
                   onKeyDown={handleKeyDown}
                 />
                 <button
                   onClick={() => handleSendMessage(attachedFiles, setAttachedFiles)}
-                  disabled={isSending}
-                  className={`p-2 mb-0.5 rounded-xl text-white ${isSending ? 'bg-gray-500 opacity-50 cursor-not-allowed' : 'bg-prime-500 hover:bg-prime-600'}`}
+                  disabled={isSending || (!messageInput.trim() && attachedFiles.length === 0)}
+                  className={`p-3 mb-0.5 rounded-2xl transition-all duration-500 shadow-xl ${
+                    isSending || (!messageInput.trim() && attachedFiles.length === 0)
+                      ? 'bg-gray-800 text-gray-600 opacity-50 cursor-not-allowed' 
+                      : 'bg-gradient-to-br from-prime-500 to-indigo-600 text-white hover:scale-105 active:scale-95 shadow-prime-500/20'
+                  }`}
                 >
-                  {isSending ? <RotateCcw size={18} className="animate-spin" /> : <ChevronRight size={18} />}
+                  {isSending ? <RotateCcw size={20} className="animate-spin" /> : <ChevronRight size={20} strokeWidth={3} />}
                 </button>
               </div>
             </div>

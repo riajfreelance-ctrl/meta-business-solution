@@ -307,9 +307,9 @@ const ProductHub = ({ isDarkMode, t, products }) => {
             >
               {/* Discount Badge */}
               {discount > 0 && (
-                <div className="absolute top-6 left-6 z-20 animate-bounce">
-                  <div className="bg-red-500 text-white text-[10px] font-black px-3 py-1 rounded-full shadow-lg">
-                    -{discount}% OFF
+                <div className="absolute top-6 left-6 z-20">
+                  <div className="bg-red-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse">
+                    -{discount}% LIMITED
                   </div>
                 </div>
               )}
@@ -350,12 +350,15 @@ const ProductHub = ({ isDarkMode, t, products }) => {
                     </div>
                   </div>
                 )}
-                <div className="absolute bottom-6 left-6 right-6">
-                    <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${
-                      product.stock === 'Out of Stock' ? 'bg-red-500/20 text-red-500' : 'bg-green-500/20 text-green-500'
+                <div className="absolute bottom-6 left-6 right-6 flex justify-between items-center">
+                    <span className={`px-4 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest border border-white/10 backdrop-blur-md ${
+                      product.stock === 'Out of Stock' ? 'bg-red-500/40 text-white' : 'bg-green-500/40 text-white'
                     }`}>
                       {product.stock}
                     </span>
+                    <div className="w-8 h-8 rounded-full bg-prime-500/20 backdrop-blur-md border border-white/10 flex items-center justify-center text-prime-400">
+                      <Sparkles size={12} />
+                    </div>
                 </div>
               </div>
 
@@ -404,12 +407,12 @@ const ProductHub = ({ isDarkMode, t, products }) => {
 
       {/* Add Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 bg-black/80 backdrop-blur-md">
-          <div className={`w-full max-w-xl rounded-[2.5rem] md:rounded-[3rem] border p-6 md:p-10 relative animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto ${isDarkMode ? 'bg-[#0a0f1d] border-white/10' : 'bg-white border-black/5'}`}>
-            <button onClick={() => setIsAddModalOpen(false)} className="absolute top-8 right-8 text-gray-500 hover:text-white transition-colors">
-              <X size={24} />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 bg-black/40 backdrop-blur-2xl animate-in fade-in duration-500">
+          <div className={`w-full max-w-xl glass-card p-6 md:p-10 relative animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto ${isDarkMode ? 'dark' : ''}`}>
+            <button onClick={() => setIsAddModalOpen(false)} className="absolute top-8 right-8 w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-gray-500 hover:text-white hover:bg-red-500/20 transition-all">
+              <X size={20} />
             </button>
-            <h3 className="text-2xl font-black mb-8  uppercase tracking-tighter">Register New <span className="text-prime-500">Product</span></h3>
+            <h3 className="text-3xl font-black mb-8 uppercase tracking-tighter text-white">Register <span className="text-prime-500 text-stroke-thin">Product</span></h3>
             
             <form onSubmit={handleAddProduct} className="space-y-6">
               <div className="grid grid-cols-2 gap-6">
@@ -516,7 +519,7 @@ const ProductHub = ({ isDarkMode, t, products }) => {
                       value={imgUrl}
                       onChange={e => handleImageChange('add', idx, e.target.value)}
                       placeholder="https://..."
-                      className={`flex-1 p-4 rounded-2xl outline-none border transition-all ${isDarkMode ? 'bg-white/5 border-white/10 focus:border-prime-500/50' : 'bg-gray-50 border-black/5'}`} 
+                      className="glass-input flex-1 p-4 rounded-2xl outline-none"
                     />
 
                     {/* Hidden File Input */}
@@ -559,12 +562,12 @@ const ProductHub = ({ isDarkMode, t, products }) => {
 
       {/* Edit Modal */}
       {editingProduct && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 bg-black/80 backdrop-blur-md">
-          <div className={`w-full max-w-xl rounded-[2.5rem] md:rounded-[3rem] border p-6 md:p-10 relative animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto ${isDarkMode ? 'bg-[#0a0f1d] border-white/10' : 'bg-white border-black/5'}`}>
-            <button onClick={() => setEditingProduct(null)} className="absolute top-8 right-8 text-gray-500 hover:text-white transition-colors">
-              <X size={24} />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 bg-black/40 backdrop-blur-2xl animate-in fade-in duration-500">
+          <div className={`w-full max-w-xl glass-card p-6 md:p-10 relative animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto ${isDarkMode ? 'dark' : ''}`}>
+            <button onClick={() => setEditingProduct(null)} className="absolute top-8 right-8 w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-gray-500 hover:text-white hover:bg-red-500/20 transition-all">
+              <X size={20} />
             </button>
-            <h3 className="text-2xl font-black mb-8  uppercase tracking-tighter">Edit <span className="text-prime-500">Product</span></h3>
+            <h3 className="text-3xl font-black mb-8 uppercase tracking-tighter text-white">Edit <span className="text-prime-500 text-stroke-thin">Product</span></h3>
             
             <form onSubmit={handleUpdateProduct} className="space-y-6">
               <div className="grid grid-cols-2 gap-6">
@@ -670,7 +673,7 @@ const ProductHub = ({ isDarkMode, t, products }) => {
                       type="text" 
                       value={imgUrl}
                       onChange={e => handleImageChange('edit', idx, e.target.value)}
-                      className={`flex-1 p-4 rounded-2xl outline-none border transition-all ${isDarkMode ? 'bg-white/5 border-white/10 focus:border-prime-500/50' : 'bg-gray-50 border-black/5'}`} 
+                      className="glass-input flex-1 p-4 rounded-2xl outline-none"
                     />
 
                     {/* Hidden File Input */}

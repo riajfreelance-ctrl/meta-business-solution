@@ -76,7 +76,7 @@ export const BrandProvider = ({ children }) => {
 
   const registerBrand = async (brandName, planId = 'free_trial') => {
     try {
-      const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
+      const { collection, addDoc, updateDoc, serverTimestamp } = await import('firebase/firestore');
       
       const PLAN_LIMITS = {
         free_trial: { maxOrders: 50, maxProducts: 20, aiRepliesPerMonth: 100, activeAgents: 1 },

@@ -39,7 +39,7 @@ const { indexBrandProducts, findProductByPHash } = require('../services/productF
  * will break the inbox routing and automation systems. 
  * ========================================================================= 
  */
-const crypto = require('crypto');
+// crypto already declared on line 1
 
 // --- PHASE 2: MULTI-MESSAGE ACCUMULATOR ---
 // Debounces rapid-fire messages into a single conversational thread
@@ -67,6 +67,87 @@ async function withRetry(fn, retries = 3, delayMs = 1500) {
                 throw e;
             }
         }
+    }
+}
+
+// ─── VERCEL SAFEGUARDS (TIMEOUT & IDEMPOTENCY) ───
+const trace = async (name, promise) => {
+    const start = Date.now();
+    serverLog(`[TRACE] [${name}] Started`);
+    try {
+        const result = await promise;
+        serverLog(`[TRACE] [${name}] Finished in ${Date.now() - start}ms`);
+        return result;
+    } catch (error) {
+        serverLog(`[TRACE] [${name}] Failed after ${Date.now() - start}ms. Error: ${error.message}`);
+        throw error;
+    }
+};
+
+const withTimeout = (promise, ms, name, timeoutCallback) => {
+    let timeoutHandle;
+    const timeoutPromise = new Promise((_, reject) => {
+        timeoutHandle = setTimeout(async () => {
+            serverLog(`[TIMEOUT] Task ${name} exceeded ${ms}ms.`);
+            if (timeoutCallback) {
+                try { await trace(`FallbackSave_${name}`, timeoutCallback()); } catch(e){}
+            }
+            reject(new Error(`Timeout: ${name}`));
+        }, ms);
+    });
+    return Promise.race([ promise, timeoutPromise ]).finally(() => clearTimeout(timeoutHandle));
+};
+
+async function checkIdempotencySafe(eventId) {
+    if (!eventId) return true;
+    try {
+        await trace(`${eventId}:Idempotency`, db.collection('processed_events').doc(eventId).create({
+            timestamp: serverTimestamp()
+        }));
+        return true; 
+    } catch (e) {
+        if (e.code === 6) { // ALREADY_EXISTS in Firestore
+            serverLog(`[IDEMPOTENCY] Race blocked. Event ${eventId} already exists.`);
+            return false;
+        }
+        return true; // proceed if transient error
+    }
+}
+// ---------------------------------------------
+
+/**
+ * Centrally handles Facebook API errors, specifically identifying token expiration (Code 190)
+ * and updating the brand's health status in Firestore so it's visible on the dashboard.
+ */
+async function handleFbApiError(error, brandData) {
+    if (!brandData || !brandData.id) return;
+    try {
+        let errObj;
+        try {
+            errObj = JSON.parse(error.message);
+        } catch (e) {
+            // Not a JSON error, maybe a raw Axios error
+            const msg = error.response?.data?.error?.message || error.message || "";
+            const code = error.response?.data?.error?.code;
+            errObj = { classification: 'OTHER', code, message: msg };
+        }
+
+        const isExpired = 
+            errObj.code === 190 || 
+            errObj.code === 10 || 
+            errObj.code === 2022 ||
+            (errObj.message && (errObj.message.includes('expired') || errObj.message.includes('access token')));
+
+        if (isExpired) {
+            serverLog(`[CRITICAL] Token Expired for brand ${brandData.id}. Flagging in Firestore.`);
+            await db.collection('brands').doc(brandData.id).update({
+                tokenStatus: 'EXPIRED',
+                lastHealthError: errObj.message,
+                lastErrorTimestamp: serverTimestamp()
+            }).catch(e => console.error('Failed to update brand status:', e.message));
+        }
+    } catch (e) {
+        serverLog(`[handleFbApiError LOGIC ERROR] ${e.message}`);
     }
 }
 
@@ -147,13 +228,22 @@ async function handleWebhookPost(req, res) {
                 let brandData = await getBrandByPlatformId(platformId, platformType);
                 
                 // --- UNIVERSAL FALLBACK FOR SKINZY ---
-                if (!brandData && platformType === 'facebook') {
-                    serverLog(`[WEBHOOK FALLBACK] Brand not found for id ${platformId}. Using Azlaan (Skinzy) as fallback.`);
-                    brandData = await getBrandByPlatformId('963307416870090', 'facebook'); // Force lookup by Skinzy id
+                if (!brandData) {
+                    serverLog(`[WEBHOOK FALLBACK] Brand not found for id ${platformId} (${platformType}). Using Skinzy as fallback.`);
+                    // Skinzy Page ID is '963307416870090'
+                    brandData = await getBrandByPlatformId('963307416870090', 'facebook'); 
                 }
                 
                 if (!brandData) {
-                    serverLog(`[WEBHOOK] Entry.id ${platformId} not found in Firestore/Env. Data: ${JSON.stringify(entry)}`);
+                    serverLog(`[WEBHOOK ERROR] Entry.id ${platformId} not found in Firestore/Env.`);
+                    await db.collection('unhandled_webhooks').add({
+                        payload: entry,
+                        platformId,
+                        platformType,
+                        timestamp: Date.now(),
+                        reason: 'BRAND_NOT_FOUND'
+                    }).catch(() => {});
+                    continue; // Skip processing this unhandled entry
                 } else {
                     serverLog(`[WEBHOOK SUCCESS] Matched Brand: ${brandData.name} (ID: ${brandData.id}) for Entry.id: ${platformId}`);
                 }
@@ -177,7 +267,14 @@ async function handleWebhookPost(req, res) {
                             if (webhook_event.message.is_echo) {
                                 tasks.push(handleEchoMessage(webhook_event, brandData));
                             } else {
-                                tasks.push(processIncomingMessage(sender_psid, webhook_event.message, brandData, platformType));
+                                const eventId = webhook_event.message.mid ? `msg_${webhook_event.message.mid}` : null;
+                                const msgTask = checkIdempotencySafe(eventId).then(canProceed => {
+                                    if (!canProceed) return;
+                                    return trace(`${eventId}:LogicAndReply`, withTimeout(processIncomingMessage(sender_psid, webhook_event.message, brandData, platformType), 5000, 'processMessage', async () => {
+                                        await db.collection('conversations').doc(sender_psid).set({ status: 'pending', isPriority: true, error: 'TIMEOUT' }, { merge: true }).catch(()=>{});
+                                    }));
+                                });
+                                tasks.push(msgTask);
                             }
                         }
 
@@ -190,19 +287,31 @@ async function handleWebhookPost(req, res) {
                 if (entry.changes) {
                     for (const change of entry.changes) {
                         if (brandData && change.field === 'feed' && change.value.item === 'comment' && change.value.verb === 'add') {
-                            tasks.push(processIncomingComment(change.value, brandData));
-                        } else if (!brandData && change.field === 'feed') {
-                            // Fallback lookup specifically for comments if main lookup failed
-                            const fallbackBrand = await getBrandByPlatformId('963307416870090', 'facebook');
-                            if (fallbackBrand && change.value.item === 'comment' && change.value.verb === 'add') {
-                                tasks.push(processIncomingComment(change.value, fallbackBrand));
-                            }
+                            const eventId = change.value.comment_id ? `cmt_${change.value.comment_id}` : null;
+                            const cmtTask = checkIdempotencySafe(eventId).then(canProceed => {
+                                if (!canProceed) return;
+                                return trace(`${eventId}:LogicAndReply`, withTimeout(processIncomingComment(change.value, brandData), 5000, 'processComment', async () => {
+                                    await db.collection("pending_comments").add({
+                                        commentId: change.value.comment_id,
+                                        postId: change.value.post_id,
+                                        commentText: change.value.message,
+                                        fromName: change.value.from.name,
+                                        fromId: change.value.from.id,
+                                        brandId: brandData.id,
+                                        timestamp: serverTimestamp(),
+                                        status: 'pending',
+                                        type: 'timeout',
+                                        error: 'Vercel execution timed out.'
+                                    }).catch(()=>{});
+                                }));
+                            });
+                            tasks.push(cmtTask);
                         }
                     }
                 }
             }
 
-            await Promise.allSettled(tasks);
+            await trace('AllSettled_OuterLoop', Promise.allSettled(tasks));
             res.status(200).send('EVENT_RECEIVED');
         } else {
             res.sendStatus(404);
@@ -358,7 +467,24 @@ async function processIncomingComment(commentData, brandData) {
             if (humanDelay) await new Promise(r => setTimeout(r, Math.random() * 5000 + 5000));
             
             // Public Reply — with retry
-            await withRetry(() => replyToComment(comment_id, publicReply, brandData.fbPageToken));
+            try {
+                await withRetry(() => replyToComment(comment_id, publicReply, brandData.fbPageToken));
+            } catch (replyErr) {
+                serverLog(`[REPLY ERROR] Public reply failed: ${replyErr.message}`);
+                await db.collection("pending_comments").add({
+                    commentId: comment_id,
+                    postId: post_id,
+                    commentText: message,
+                    fromName: from.name,
+                    fromId: sender_id,
+                    brandId: brandData.id,
+                    timestamp: serverTimestamp(),
+                    status: 'pending',
+                    type: 'reply_failed',
+                    error: replyErr.message
+                }).catch(() => {});
+                await handleFbApiError(replyErr, brandData);
+            }
             
             // Private Reply (Inbox Message) — with retry
             if (privateReply) {
@@ -366,6 +492,19 @@ async function processIncomingComment(commentData, brandData) {
                     await withRetry(() => sendPrivateReply(comment_id, privateReply, brandData.fbPageToken));
                 } catch (dmErr) {
                     serverLog(`[DM WARN] Private reply failed (may be FB limitation): ${dmErr.message}`);
+                    await db.collection("pending_comments").add({
+                        commentId: comment_id,
+                        postId: post_id,
+                        commentText: message,
+                        fromName: from.name,
+                        fromId: sender_id,
+                        brandId: brandData.id,
+                        timestamp: serverTimestamp(),
+                        status: 'pending',
+                        type: 'dm_failed',
+                        error: dmErr.message
+                    }).catch(() => {});
+                    await handleFbApiError(dmErr, brandData);
                 }
                 
                 // If there's a button, send it as a follow-up template
@@ -436,38 +575,86 @@ async function getShuffledReply(message, brandId, postId = null) {
     }
 
     // 2. Fuzzy Matching for Comments (Global Rules)
+    const lowerText = message.toLowerCase();
+    const normalizedInput = normalizePhonetic(lowerText);
+    const cleanedInput = cleanNoise(lowerText);
+
     const searchableRecords = [];
     drafts.forEach(draft => {
         if (draft.postId && draft.postId !== postId) return; // Skip post-specific ones for other posts
         (draft.keywords || []).forEach(kw => {
-            searchableRecords.push({ phrase: kw, draft: draft });
+            searchableRecords.push({ 
+                phrase: kw, 
+                normalized: normalizePhonetic(kw.toLowerCase()),
+                draft: draft 
+            });
         });
     });
 
     if (searchableRecords.length > 0) {
         const fuse = new Fuse(searchableRecords, {
-            keys: ['phrase'],
-            threshold: 0.35,
+            keys: ['phrase', 'normalized'],
+            threshold: 0.45, // Slightly more permissive for comments
             includeScore: true
         });
-        const results = fuse.search(message);
-        if (results.length > 0 && results[0].score <= 0.35) {
+
+        let results = fuse.search(lowerText);
+
+        // Always try phonetic search and take the best result
+        const phoneticResults = fuse.search(normalizedInput);
+        if (phoneticResults.length > 0 && (!results[0] || phoneticResults[0].score < (results[0]?.score ?? 1))) {
+            results = phoneticResults;
+        }
+        
+        // Always try cleaned noise search
+        if (cleanedInput && cleanedInput !== lowerText) {
+            const cleanedResults = fuse.search(cleanedInput);
+            if (cleanedResults.length > 0 && (!results[0] || cleanedResults[0].score < (results[0]?.score ?? 1))) {
+                results = cleanedResults;
+            }
+        }
+
+        if (results.length > 0 && results[0].score <= 0.45) {
             const bestMatch = results[0].item.draft;
             const index = Math.floor(Math.random() * bestMatch.variations.length);
-            serverLog(`[Comment] Global match found for: ${message} (Score: ${results[0].score})`);
+            serverLog(`[Comment Match ✅] Match found for: ${message} (Score: ${results[0].score.toFixed(3)})`);
             return { variation: bestMatch.variations[index], draftId: bestMatch.id, index };
         }
     }
 
-    // 3. Last Resort: Simple Fallback match
+    // 3. Last Resort: Simple Fallback match & Catch-All
+    const catchAllDrafts = [];
+    
     for (const draft of drafts) {
-        if (draft.postId) continue; 
-        const match = (draft.keywords || []).some(kw => message.toLowerCase().includes(kw.toLowerCase()));
+        if (draft.postId) continue;
+        
+        const isCatchAll = !draft.keywords || draft.keywords.length === 0;
+        if (isCatchAll) {
+            catchAllDrafts.push(draft);
+            continue;
+        }
+
+        const match = (draft.keywords || []).some(kw => 
+            lowerText.includes(kw.toLowerCase()) || 
+            normalizedInput.includes(normalizePhonetic(kw.toLowerCase()))
+        );
         if (match && draft.variations?.length > 0) {
             const index = Math.floor(Math.random() * draft.variations.length);
+            serverLog(`[Comment Keyword] Absolute fallback match for: ${message}`);
             return { variation: draft.variations[index], draftId: draft.id, index };
         }
     }
+    
+    // 4. If no keyword matched, use a random catch-all draft if available
+    if (catchAllDrafts.length > 0) {
+        const randomDraft = catchAllDrafts[Math.floor(Math.random() * catchAllDrafts.length)];
+        if (randomDraft.variations?.length > 0) {
+            const index = Math.floor(Math.random() * randomDraft.variations.length);
+            serverLog(`[Comment] Catch-All fallback used for: ${message}`);
+            return { variation: randomDraft.variations[index], draftId: randomDraft.id, index };
+        }
+    }
+
     return null;
 }
 
@@ -486,10 +673,12 @@ async function getApprovedInboxDraft(message, brandId, convoData) {
             .get()
     ]);
     
-    // Filter Drafts in memory: status is missing OR status == 'approved'
+    // Filter Drafts in memory: Accept ALL statuses except explicitly rejected ones
+    // BUG FIX: 'pending' (auto-learned) and 'draft' were being excluded — now included
+    const rejectedStatuses = ['rejected', 'disabled', 'archived'];
     const drafts = draftSnap.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter(d => !d.status || d.status === 'approved');
+        .filter(d => !d.status || !rejectedStatuses.includes((d.status || '').toLowerCase()));
     const kbRules = kbSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
     // 2. Normalize and Flatten data for Fuse.js
@@ -524,27 +713,29 @@ async function getApprovedInboxDraft(message, brandId, convoData) {
     const normalizedInput = normalizePhonetic(lowerText);
     const cleanedInput = cleanNoise(lowerText);
 
-    // 3. Configure Fuse for fuzzy matching
+    // 3. Configure Fuse for fuzzy matching (Tuned for Bangla parsing)
     const fuse = new Fuse(searchableRecords, {
         keys: ['phrase'],
         includeScore: true,
-        threshold: 0.3,
-        ignoreLocation: true
+        threshold: 0.45,
+        ignoreLocation: true,
+        distance: 100
     });
 
-    // Strategy: Exact match priority -> Phonetic -> Cleaned Noise
+    // Strategy: ALWAYS run all 3 search strategies and take the best score
+    // BUG FIX: was only running phonetic/cleaned when score > 0.2, missing many valid matches
     let results = fuse.search(lowerText);
     
-    if (results.length === 0 || results[0].score > 0.2) {
-        const phoneticResults = fuse.search(normalizedInput);
-        if (phoneticResults.length > 0 && (!results[0] || phoneticResults[0].score < results[0].score)) {
-            results = phoneticResults;
-        }
+    // Always try phonetic search and take the best result
+    const phoneticResults = fuse.search(normalizedInput);
+    if (phoneticResults.length > 0 && (!results[0] || phoneticResults[0].score < (results[0]?.score ?? 1))) {
+        results = phoneticResults;
     }
     
-    if ((results.length === 0 || results[0].score > 0.2) && cleanedInput !== lowerText) {
+    // Always try cleaned noise search
+    if (cleanedInput && cleanedInput !== lowerText) {
         const cleanedResults = fuse.search(cleanedInput);
-        if (cleanedResults.length > 0 && (!results[0] || cleanedResults[0].score < results[0].score)) {
+        if (cleanedResults.length > 0 && (!results[0] || cleanedResults[0].score < (results[0]?.score ?? 1))) {
             results = cleanedResults;
         }
     }
@@ -560,46 +751,51 @@ async function getApprovedInboxDraft(message, brandId, convoData) {
         });
 
         const bestMatch = results[0];
-        if (bestMatch.score <= 0.38) { // Slightly increased threshold for robustness
+        serverLog(`[MATCH_RESULT] Matched "${bestMatch.item.phrase}" for input "${lowerText}" with score: ${bestMatch.score.toFixed(3)}`);
+        
+        if (bestMatch.score <= 0.45) {
             let resultText = bestMatch.item.result;
-            
-            const sentiment = convoData?.sentiment || 'Neutral';
-            if (sentiment === 'Negative') {
-                const apologies = [
-                    "আন্তরিকভাবে দুঃখিত আপনার অসুবিধার জন্য। ",
-                    "আমরা আপনার সমস্যার জন্য দুঃখ প্রকাশ করছি। ",
-                    "আপনার অভিজ্ঞতার জন্য আমরা ক্ষমাপ্রার্থী। "
-                ];
-                const prefix = apologies[Math.floor(Math.random() * apologies.length)];
-                resultText = prefix + resultText;
+            // BUG FIX: guard against null/undefined result before returning
+            if (!resultText) {
+                serverLog(`[MATCH_WARN] Match found but result is empty for phrase: ${bestMatch.item.phrase}`);
+            } else {
+                const sentiment = convoData?.sentiment || 'Neutral';
+                if (sentiment === 'Negative') {
+                    const apologies = [
+                        "আন্তরিকভাবে দুঃখিত আপনার অসুবিধার জন্য। ",
+                        "আমরা আপনার সমস্যার জন্য দুঃখ প্রকাশ করছি। ",
+                        "আপনার অভিজ্ঞতার জন্য আমরা ক্ষমাপ্রার্থী। "
+                    ];
+                    const prefix = apologies[Math.floor(Math.random() * apologies.length)];
+                    resultText = prefix + resultText;
+                }
+                serverLog(`[Unified Match ✅] Score: ${bestMatch.score.toFixed(3)} | Type: ${bestMatch.item.type} | Input: ${lowerText} | Match: ${bestMatch.item.phrase}`);
+                return { text: resultText, result: resultText, draftId: (bestMatch.item.ruleId || bestMatch.item.draftId) };
             }
-            
-            serverLog(`[Unified Match] Score: ${bestMatch.score.toFixed(3)} | Type: ${bestMatch.item.type} | Input: ${lowerText} | Match: ${bestMatch.item.phrase}`);
-            return { text: resultText, result: resultText, draftId: (bestMatch.item.ruleId || bestMatch.item.draftId) };
         }
     }
 
-    // 4. Intent Fallback + Simple Keyword Includes (Robustness Phase)
+    // 4. Absolute Keyword Includes Fallback (works for ANY message, not just detected intents)
+    // BUG FIX: was gated behind basicIntent detection — now runs for all messages
+    const includesMatch = searchableRecords.find(r =>
+        r.result && // only match if there's actually a result to send
+        (
+            lowerText.includes(r.phrase.toLowerCase()) ||
+            (r.phrase.length > 3 && lowerText.includes(normalizePhonetic(r.phrase)))
+        )
+    );
+    if (includesMatch) {
+        serverLog(`[Keyword Includes ✅] Matched phrase: "${includesMatch.phrase}"`);
+        return { text: includesMatch.result, result: includesMatch.result, draftId: (includesMatch.ruleId || includesMatch.draftId) };
+    }
+
+    // 5. Intent-based fallback (secondary)
     const basicIntent = detectBasicIntent(message);
     if (basicIntent.intent !== 'UNKNOWN') {
         const intentKeyword = basicIntent.intent.replace('ASK_', '').charAt(0).toUpperCase() + basicIntent.intent.replace('ASK_', '').toLowerCase().slice(1);
-        
-        // Search by keyword inclusion as absolute fallback
-        const includesMatch = searchableRecords.find(r => 
-            lowerText.includes(r.phrase.toLowerCase()) || 
-            (r.phrase.length > 3 && lowerText.includes(normalizePhonetic(r.phrase)))
-        );
-        if (includesMatch) {
-             serverLog(`[Keyword Fallback] Matched: ${includesMatch.phrase}`);
-             return { text: includesMatch.result, result: includesMatch.result, draftId: (includesMatch.ruleId || includesMatch.draftId) };
-        }
-        
-        // Check KB for Intent
         const intentMatch = kbRules.find(r => r.keywords?.some(kw => kw.toLowerCase() === intentKeyword.toLowerCase()));
         if (intentMatch) return { text: intentMatch.answer, result: intentMatch.answer, draftId: intentMatch.id };
-        
-        // Fallback to Drafts
-        const draftMatch = drafts.find(d => d.keyword?.toLowerCase() === intentKeyword.toLowerCase());
+        const draftMatch = drafts.find(d => d.keyword?.toLowerCase() === intentKeyword.toLowerCase() && d.result);
         if (draftMatch) return { text: draftMatch.result, result: draftMatch.result, draftId: draftMatch.id };
     }
 
@@ -777,9 +973,11 @@ async function processThreadedMessage(sender_psid, message, brandData, platformT
             const matchedReply = await getApprovedInboxDraft(messageText, brandData.id, convoData)
                 .catch(e => { serverLog(`[DRAFT ERROR] ${e.message}`); return null; });
 
-            if (matchedReply && matchedReply.result) {
-                serverLog(`[DRAFT ✅] Match found → "${matchedReply.result.substring(0, 80)}"`);
-                await sendAndLog(sender_psid, matchedReply.result, 'bot', brandData);
+            // BUG FIX: getApprovedInboxDraft returns { text, result, draftId } — check both 'result' AND 'text'
+            const replyText = matchedReply?.result || matchedReply?.text;
+            if (matchedReply && replyText) {
+                serverLog(`[DRAFT ✅] Match found → "${replyText.substring(0, 80)}"`);
+                await sendAndLog(sender_psid, replyText, 'bot', brandData);
                 await db.collection('conversations').doc(sender_psid).set({ lastMatchedDraftId: matchedReply.draftId || null }, { merge: true });
                 return;
             }
@@ -1106,6 +1304,7 @@ async function sendAndLog(psid, text, type, brandData) {
             serverLog(`[Send SUCCESS] Sent ${type} reply to ${psid}`);
         } catch (error) {
             serverLog(`[Send ERROR] Failed to send message to ${psid}: ${error.response?.data?.error?.message || error.message}`);
+            await handleFbApiError(error, brandData);
         }
         
         const nowMs = Date.now();
@@ -1526,9 +1725,9 @@ async function syncConversationHistory(req, res) {
     let { brandId } = req.body;
     serverLog(`[SYNC] Request for Brand ID: "${brandId}"`);
     
-    // Default to owner_dev_brand if not provided or for local dev
+    // Default to Skinzy if not provided or for local dev
     if (!brandId || brandId === 'Skinzy' || brandId === 'owner_dev_brand') {
-        brandId = 'owner_dev_brand';
+        brandId = 'Skinzy';
     }
 
     try {
@@ -1538,7 +1737,7 @@ async function syncConversationHistory(req, res) {
         let brandData;
         if (brandSnap.exists) {
             brandData = { id: brandSnap.id, ...brandSnap.data() };
-        } else if (brandId === 'owner_dev_brand' || brandId === 'Skinzy') {
+        } else if (brandId === 'Skinzy' || brandId === 'owner_dev_brand') {
             // Owner Fallback from .env
             brandData = {
                 id: 'Skinzy',
@@ -1981,7 +2180,6 @@ async function proxyUpload(req, res) {
 }
 
 module.exports = {
-   // Existing exports...
    verifyWebhook,
    handleWebhookPost,
    syncConversationHistory,
@@ -1989,6 +2187,14 @@ module.exports = {
    generateAICommentVariations,
    getLatestPosts,
    getPostById,
-   proxyUpload 
+   proxyUpload,
+   
+   // Logic Engines (for testing/direct use if needed)
+   getApprovedInboxDraft,
+   getShuffledReply,
+   processIncomingMessage,
+   processIncomingComment,
+   handleAIResponse,
+   handleVisionResponse
 };
 

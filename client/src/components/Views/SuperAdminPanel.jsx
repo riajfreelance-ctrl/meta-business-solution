@@ -12,20 +12,20 @@ import { doc, updateDoc, collection, addDoc, serverTimestamp, deleteDoc, query, 
 const GlobalStatCard = ({ title, value, icon: Icon, color, subtext, onClick, isActive }) => (
   <button 
     onClick={onClick}
-    className={`w-full text-left p-6 rounded-[2.5rem] border transition-all duration-500 relative overflow-hidden group ${
-      isActive ? 'border-prime-500 bg-prime-500/5 shadow-2xl shadow-prime-500/10 scale-[1.02]' : 'bg-[#0b1120] border-slate-800 shadow-xl hover:border-slate-700'
+    className={`glass-card p-8 text-left transition-all duration-500 relative overflow-hidden group border-none ${
+      isActive ? 'shadow-[0_0_30px_rgba(107,33,168,0.2)] scale-[1.05]' : 'bg-slate-950/20'
     }`}
   >
-    <div className={`absolute top-0 right-0 w-32 h-32 opacity-10 blur-3xl rounded-full -mr-10 -mt-10 transition-all group-hover:opacity-20 ${color}`} />
-    <div className="flex justify-between items-start mb-4">
-      <div className={`p-3 rounded-2xl ${color} bg-opacity-20`}>
-        <Icon className={`w-6 h-6 ${color.replace('bg-', 'text-')}`} />
+    <div className={`absolute top-0 right-0 w-32 h-32 blur-[80px] opacity-10 transition-all group-hover:opacity-30 ${color}`} />
+    <div className="flex justify-between items-start mb-6">
+      <div className={`p-4 rounded-2xl ${color} bg-opacity-20 backdrop-blur-md border border-white/5`}>
+        <Icon className={`w-6 h-6 ${color.replace('bg-', 'text-').replace('-500', '-400')}`} />
       </div>
-      <ArrowUpRight size={16} className={`transition-transform duration-500 ${isActive ? 'translate-x-1 -translate-y-1 text-prime-500' : 'text-slate-600'}`} />
+      <ArrowUpRight size={18} className={`transition-transform duration-500 ${isActive ? 'translate-x-1 -translate-y-1 text-prime-500' : 'text-slate-700'}`} />
     </div>
-    <h4 className="text-slate-400 text-xs font-black uppercase tracking-widest mb-1">{title}</h4>
-    <div className="text-3xl font-black tracking-tighter text-white">{value}</div>
-    {subtext && <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2">{subtext}</p>}
+    <h4 className="text-gray-500 text-[9px] font-black uppercase tracking-[0.3em] mb-2">{title}</h4>
+    <div className="text-4xl font-black tracking-tighter text-white">{value}</div>
+    {subtext && <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mt-3">{subtext}</p>}
   </button>
 );
 
@@ -175,26 +175,23 @@ const SuperAdminPanel = ({ isDarkMode, t }) => {
       {/* ── HEADER ── */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <ShieldCheck size={16} className="text-prime-400" />
-            <span className="text-[10px] font-black tracking-widest uppercase text-prime-400">Vortex Command Center</span>
-          </div>
-          <h1 className="text-4xl font-black tracking-tighter text-white">
-            Site <span className="text-transparent bg-clip-text bg-gradient-to-r from-prime-500 to-purple-500">Manager</span>
+          <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white uppercase flex items-center gap-4">
+            <ShieldCheck size={48} className="text-prime-500 text-stroke-thin" />
+            Vortex <span className="text-prime-500 text-stroke-thin">Matrix</span>
           </h1>
-          <p className="text-sm font-medium text-slate-400 mt-2 max-w-xl">
-            Real-time multi-tenant intelligence. Monitor platform health, manage brand fleet, and enforce system-wide quotas.
+          <p className="text-[11px] font-black uppercase tracking-[0.4em] text-prime-500 mt-4 flex items-center gap-2">
+            <Cpu size={14} /> Neural Fleet Command Center
           </p>
         </div>
 
-        <div className="flex items-center gap-4 bg-[#0b1120] p-2 rounded-2xl border border-slate-800 shadow-xl">
-            <div className="flex items-center gap-2 px-4 py-2 bg-prime-500/10 rounded-xl border border-prime-500/20">
-               <div className="w-2 h-2 rounded-full bg-prime-500 animate-pulse" />
-               <span className="text-[10px] font-black uppercase text-prime-400">System Live</span>
+        <div className="flex items-center gap-4 glass-card p-3 border-none">
+            <div className="flex items-center gap-2 px-5 py-2.5 bg-prime-500/10 rounded-xl border border-prime-500/10">
+               <div className="w-2 h-2 rounded-full bg-prime-500 animate-pulse shadow-[0_0_10px_rgba(107,33,168,1)]" />
+               <span className="text-[9px] font-black uppercase tracking-widest text-prime-400">System Nominal</span>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 bg-green-500/10 rounded-xl border border-green-500/20">
-               <Globe size={12} className="text-green-500" />
-               <span className="text-[10px] font-black uppercase text-green-500">API: Healthy</span>
+            <div className="flex items-center gap-2 px-5 py-2.5 bg-blue-500/10 rounded-xl border border-blue-500/10">
+               <Globe size={12} className="text-blue-400 animate-spin-slow" />
+               <span className="text-[9px] font-black uppercase tracking-widest text-blue-400">API Active</span>
             </div>
         </div>
       </div>
@@ -232,34 +229,38 @@ const SuperAdminPanel = ({ isDarkMode, t }) => {
 
       {/* ── SYSTEM PULSE ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-         <div className="p-8 rounded-[3rem] border bg-[#0b1120] border-slate-800 shadow-xl flex items-center justify-between">
-            <div className="flex items-center gap-4">
-               <div className="w-16 h-16 rounded-3xl bg-prime-600/20 flex items-center justify-center text-prime-400">
-                  <Activity size={32} />
+         <div className="glass-card p-10 relative overflow-hidden dark border-none">
+            <div className="flex items-center gap-6 relative z-10">
+               <div className="w-20 h-20 rounded-[2.5rem] bg-prime-500/20 border border-prime-500/30 flex items-center justify-center text-prime-400 shadow-[0_0_30px_rgba(107,33,168,0.2)]">
+                  <Cpu size={36} />
                </div>
-               <div>
-                  <h4 className="text-xl font-black text-white">Gemini Pro 1.5</h4>
-                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Model Latency: {healthData.latency}s</p>
+               <div className="flex-1">
+                  <h4 className="text-2xl font-black text-white tracking-tighter uppercase">Processor <span className="text-prime-500">Node Alpha</span></h4>
+                  <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.3em] mt-2 flex items-center gap-2">
+                    <Activity size={12} className="text-prime-500" /> Latency Pipeline: {healthData.latency}s
+                  </p>
                </div>
-            </div>
-            <div className="text-right">
-               <div className="text-2xl font-black text-white tracking-widest">{healthData.uptime}%</div>
-               <div className="text-[10px] text-green-500 font-bold uppercase tracking-widest">Uptime</div>
+               <div className="text-right">
+                  <div className="text-3xl font-black text-white tracking-tighter">{healthData.uptime}%</div>
+                  <div className="text-[9px] text-prime-400 font-black uppercase tracking-[0.2em] mt-1 pulse-glow px-2 py-0.5 rounded-lg border border-prime-500/20 bg-prime-500/10">Stable</div>
+               </div>
             </div>
          </div>
-         <div className="p-8 rounded-[3rem] border bg-[#0b1120] border-slate-800 shadow-xl flex items-center justify-between">
-            <div className="flex items-center gap-4">
-               <div className="w-16 h-16 rounded-3xl bg-blue-600/20 flex items-center justify-center text-blue-400">
-                  <Cpu size={32} />
+         <div className="glass-card p-10 relative overflow-hidden dark border-none">
+            <div className="flex items-center gap-6 relative z-10">
+               <div className="w-20 h-20 rounded-[2.5rem] bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shadow-[0_0_30px_rgba(59,130,246,0.2)]">
+                  <Cloud size={36} />
                </div>
-               <div>
-                  <h4 className="text-xl font-black text-white">Meta Cloud API</h4>
-                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Rate Limit: No Issues</p>
+               <div className="flex-1">
+                  <h4 className="text-2xl font-black text-white tracking-tighter uppercase">Cloud <span className="text-blue-500">Engine V3</span></h4>
+                  <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.3em] mt-2 flex items-center gap-2">
+                    <Globe size={12} className="text-blue-500" /> Regional Sync: Active
+                  </p>
                </div>
-            </div>
-            <div className="text-right">
-               <div className="text-2xl font-black text-white tracking-widest">100%</div>
-               <div className="text-[10px] text-green-500 font-bold uppercase tracking-widest">Stable</div>
+               <div className="text-right">
+                  <div className="text-3xl font-black text-white tracking-tighter">100%</div>
+                  <div className="text-[9px] text-blue-400 font-black uppercase tracking-[0.2em] mt-1 bg-blue-500/10 px-2 py-0.5 rounded-lg border border-blue-500/20">Optimal</div>
+               </div>
             </div>
          </div>
       </div>
@@ -267,103 +268,105 @@ const SuperAdminPanel = ({ isDarkMode, t }) => {
       {/* ── BROADCAST CENTER ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
          {/* Creator */}
-         <div className="lg:col-span-1 p-8 rounded-[3rem] border bg-[#0b1120] border-slate-800 shadow-xl space-y-6">
-            <div className="flex items-center gap-3 mb-2">
-               <Megaphone className="text-prime-500" size={20} />
-               <h3 className="text-xl font-black text-white">Broadcast Center</h3>
+         <div className="lg:col-span-1 glass-card p-8 dark border-none space-y-8">
+            <div className="flex items-center gap-4 mb-4">
+               <div className="w-12 h-12 rounded-2xl bg-prime-500/20 border border-prime-500/20 flex items-center justify-center text-prime-400">
+                  <Megaphone size={20} />
+               </div>
+               <h3 className="text-xl font-black text-white tracking-tight uppercase">Broadcast Hub</h3>
             </div>
             
-            <form onSubmit={handleCreateAnnouncement} className="space-y-4">
+            <form onSubmit={handleCreateAnnouncement} className="space-y-6">
                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest pl-1">Alert Title</label>
+                  <label className="text-[10px] font-black uppercase text-gray-500 tracking-[0.3em] ml-1">Transmission Title</label>
                   <input 
                     type="text" 
                     value={newAnnouncement.title}
                     onChange={(e) => setNewAnnouncement({...newAnnouncement, title: e.target.value})}
-                    placeholder="E.g. System Maintenance"
-                    className="w-full p-4 bg-black/40 border border-slate-800 rounded-2xl text-xs font-bold text-white focus:border-prime-500 transition-all outline-none"
+                    placeholder="E.g. Protocol Update"
+                    className="glass-input w-full p-4 rounded-2xl"
                   />
                </div>
                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest pl-1">Message Body</label>
+                  <label className="text-[10px] font-black uppercase text-gray-500 tracking-[0.3em] ml-1">Signal Content</label>
                   <textarea 
                     value={newAnnouncement.message}
                     onChange={(e) => setNewAnnouncement({...newAnnouncement, message: e.target.value})}
-                    placeholder="The engine will be down for 5 mins..."
-                    className="w-full p-4 bg-black/40 border border-slate-800 rounded-2xl text-xs font-bold text-white focus:border-prime-500 transition-all outline-none h-24 resize-none"
+                    placeholder="All nodes report for sync..."
+                    className="glass-input w-full p-4 rounded-2xl h-24 resize-none"
                   />
                </div>
                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                     <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest pl-1">Alert Type</label>
+                     <label className="text-[10px] font-black uppercase text-gray-500 tracking-[0.3em] ml-1">Alert Level</label>
                      <select 
                        value={newAnnouncement.type}
                        onChange={(e) => setNewAnnouncement({...newAnnouncement, type: e.target.value})}
-                       className="w-full p-4 bg-black/40 border border-slate-800 rounded-2xl text-[10px] font-black uppercase text-white focus:border-prime-500 transition-all outline-none"
+                       className="glass-input w-full p-4 rounded-2xl text-[10px] font-black uppercase"
                      >
                         <option value="info">Information</option>
                         <option value="warning">Critical Alert</option>
-                        <option value="feature">New Feature</option>
+                        <option value="feature">System Feature</option>
                      </select>
                   </div>
                   <div className="space-y-2">
-                     <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest pl-1">Learn More Link</label>
+                     <label className="text-[10px] font-black uppercase text-gray-500 tracking-[0.3em] ml-1">Access URL</label>
                      <input 
                        type="text" 
                        value={newAnnouncement.link}
                        onChange={(e) => setNewAnnouncement({...newAnnouncement, link: e.target.value})}
                        placeholder="https://..."
-                       className="w-full p-4 bg-black/40 border border-slate-800 rounded-2xl text-xs font-bold text-white focus:border-prime-500 transition-all outline-none"
+                       className="glass-input w-full p-4 rounded-2xl"
                      />
                   </div>
                </div>
                <button 
                 type="submit"
                 disabled={isBroadcasting}
-                className="w-full py-5 rounded-3xl bg-prime-500 hover:bg-prime-600 text-white font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-prime-500/20 active:scale-95"
+                className="w-full py-5 rounded-3xl bg-prime-500 hover:bg-prime-600 text-white font-black uppercase tracking-[0.3em] text-[10px] flex items-center justify-center gap-3 transition-all shadow-[0_20px_40px_-10px_rgba(107,33,168,0.3)] active:scale-95 disabled:opacity-50"
                >
-                 {isBroadcasting ? 'TRANSMITTING...' : <>Transmit Global Broadcast <Send size={14} /></>}
+                 {isBroadcasting ? 'RESONATING...' : <>Fire Global Pulse <Send size={14} /></>}
                </button>
             </form>
          </div>
 
          {/* Active Feed */}
-         <div className="lg:col-span-2 p-8 rounded-[3rem] border bg-[#0b1120] border-slate-800 shadow-xl overflow-hidden">
-            <h3 className="text-xl font-black text-white mb-6">Past Transmissions</h3>
-            <div className="space-y-4 max-h-[440px] overflow-y-auto pr-2 custom-scrollbar">
+         <div className="lg:col-span-2 glass-card p-8 dark border-none overflow-hidden">
+            <h3 className="text-xl font-black text-white mb-8 tracking-tight uppercase">Signal Logs</h3>
+            <div className="space-y-4 max-h-[440px] overflow-y-auto pr-2 scrollbar-thin">
                {announcements.map(ann => (
-                  <div key={ann.id} className="p-5 rounded-[2rem] bg-black/40 border border-slate-800 flex items-center justify-between group">
-                     <div className="flex items-center gap-4">
-                        <div className={`p-3 rounded-2xl ${
-                          ann.type === 'warning' ? 'bg-amber-500/20 text-amber-500' : 
-                          ann.type === 'feature' ? 'bg-purple-500/20 text-purple-500' : 
-                          'bg-prime-500/20 text-prime-500'
+                  <div key={ann.id} className="p-6 rounded-[2rem] bg-white/[0.02] border border-white/5 flex items-center justify-between group transition-all hover:bg-white/5">
+                     <div className="flex items-center gap-5">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                          ann.type === 'warning' ? 'bg-red-500/10 text-red-500 border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 
+                          ann.type === 'feature' ? 'bg-purple-500/10 text-purple-500 border border-purple-500/20' : 
+                          'bg-prime-500/10 text-prime-400 border border-prime-500/20'
                         }`}>
                            {ann.type === 'warning' ? <AlertTriangle size={18} /> : 
                             ann.type === 'feature' ? <Sparkles size={18} /> : 
                             <Info size={18} />}
                         </div>
                         <div>
-                           <h5 className="text-sm font-black text-white">{ann.title}</h5>
-                           <p className="text-[10px] font-bold text-slate-500">{ann.message.slice(0, 60)}...</p>
+                           <h5 className="text-[11px] font-black text-white uppercase tracking-widest">{ann.title}</h5>
+                           <p className="text-[10px] font-bold text-gray-500 mt-1">{ann.message.slice(0, 100)}...</p>
                         </div>
                      </div>
-                     <div className="flex items-center gap-3">
+                     <div className="flex items-center gap-4">
                         <button 
                           onClick={() => handleToggleAnnouncement(ann.id, ann.isActive)}
-                          className={`px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest border transition-all ${
+                          className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
                             ann.isActive 
-                              ? 'bg-green-500/10 text-green-500 border-green-500/20' 
-                              : 'bg-slate-800 text-slate-500 border-slate-700'
+                              ? 'bg-green-500/20 text-green-400 border-green-500/30' 
+                              : 'bg-white/5 text-gray-500 border-white/5'
                           }`}
                         >
-                          {ann.isActive ? 'ACTIVE' : 'PAUSED'}
+                          {ann.isActive ? 'ACTIVE' : 'OFFLINE'}
                         </button>
                         <button 
                           onClick={() => handleDeleteAnnouncement(ann.id)}
-                          className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500 border border-rose-500/20 opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500 hover:text-white"
+                          className="w-10 h-10 rounded-xl bg-red-500/10 text-red-500 border border-red-500/10 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white"
                         >
-                           <Trash2 size={14} />
+                           <Trash2 size={16} />
                         </button>
                      </div>
                   </div>
@@ -379,20 +382,22 @@ const SuperAdminPanel = ({ isDarkMode, t }) => {
       </div>
 
       {/* ── BRAND FLEET TABLE ── */}
-      <div className="p-8 rounded-[3rem] border bg-[#0b1120] border-slate-800 shadow-2xl space-y-8">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-          <h3 className="text-2xl font-black tracking-tighter text-white">
-            Brand Fleet <span className="text-slate-600 text-sm ml-2 font-bold uppercase tracking-widest">Database</span>
-            {filterType !== 'all' && <span className="ml-4 text-prime-500 text-[10px] font-black uppercase tracking-widest bg-prime-500/10 px-3 py-1 rounded-full animate-pulse border border-prime-500/20">Filtering: {filterType}</span>}
-          </h3>
-          <div className="relative w-full md:w-96">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+      <div className="glass-card p-10 dark border-none space-y-10">
+        <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
+          <div>
+            <h3 className="text-3xl font-black tracking-tighter text-white uppercase">Brand <span className="text-prime-500 text-stroke-thin">Fleet</span></h3>
+            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-500 mt-2 flex items-center gap-2">
+              <Search size={12} className="text-prime-500" /> Authorized Multi-Tenant Intelligence
+            </p>
+          </div>
+          <div className="relative w-full lg:w-[450px]">
+            <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
             <input 
               type="text" 
-              placeholder="Filter by Name, ID, or Email..."
+              placeholder="Search by Code, Domain or Vector..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-6 py-4 bg-black/40 border border-slate-800 rounded-2xl text-xs font-bold text-white focus:outline-none focus:border-prime-500 transition-all placeholder:text-slate-700 shadow-inner"
+              className="glass-input w-full pl-16 pr-8 py-5 rounded-[2rem] text-[11px] font-black uppercase tracking-widest outline-none border-none shadow-2xl"
             />
           </div>
         </div>
@@ -416,29 +421,29 @@ const SuperAdminPanel = ({ isDarkMode, t }) => {
                 const usagePerc = Math.min(Math.round((orders / limit) * 100), 100);
 
                 return (
-                  <tr key={brand.id} className={`group hover:bg-white/[0.02] transition-colors ${isImpersonating ? 'bg-prime-500/[0.03]' : ''}`}>
-                    <td className="py-6">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${isImpersonating ? 'bg-prime-500 text-white shadow-lg shadow-prime-500/20' : 'bg-slate-800 text-slate-400'}`}>
+                  <tr key={brand.id} className={`group hover:bg-white/[0.02] transition-all border-b border-white/[0.03] ${isImpersonating ? 'bg-prime-500/[0.03]' : ''}`}>
+                    <td className="py-8">
+                      <div className="flex items-center gap-5">
+                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl border border-white/5 transition-all group-hover:scale-110 ${isImpersonating ? 'bg-prime-500 text-white shadow-[0_0_20px_rgba(107,33,168,0.4)]' : 'bg-white/5 text-gray-400'}`}>
                           {brand.name?.charAt(0) || 'B'}
                         </div>
                         <div>
-                          <div className="text-sm font-black text-white">{brand.name}</div>
-                          <div className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">ID: {brand.id.slice(-6)}</div>
+                          <div className="text-lg font-black text-white tracking-tight uppercase">{brand.name}</div>
+                          <div className="text-[9px] font-black text-prime-500 uppercase tracking-[0.2em] mt-1">NODE_{brand.id.slice(-6)}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="py-6">
-                      <div className="text-xs font-bold text-slate-400">{brand.ownerEmail}</div>
+                    <td className="py-8">
+                      <div className="text-[11px] font-black text-gray-500 uppercase tracking-widest">{brand.ownerEmail}</div>
                     </td>
-                    <td className="py-6">
-                       <div className="flex flex-col gap-1.5">
-                          <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg w-fit ${
-                            brand.planStatus === 'active' ? 'bg-green-500/10 text-green-400' : 'bg-rose-500/10 text-rose-400'
+                    <td className="py-8">
+                       <div className="flex flex-col gap-2">
+                          <span className={`text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1.5 rounded-xl w-fit border border-white/10 client-status-badge ${
+                            brand.planStatus === 'active' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.2)]'
                           }`}>
-                            {brand.planStatus || 'active'}
+                            {brand.planStatus || 'ACTIVE'}
                           </span>
-                          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">{brand.plan}</span>
+                          <span className="text-[10px] font-black text-gray-600 uppercase tracking-[0.3em]">{brand.plan?.replace('_', ' ')}</span>
                        </div>
                     </td>
                     <td className="py-6 min-w-[150px]">

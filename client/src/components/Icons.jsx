@@ -15,13 +15,13 @@ export const FacebookIcon = ({ size = 20 }) => (
 export const InstagramIcon = ({ size = 20 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <defs>
-      <linearGradient id="instaGradient" x1="12" y1="0" x2="12" y2="24" gradientUnits="userSpaceOnUse">
+      <linearGradient id="instaIconGrad" x1="12" y1="0" x2="12" y2="24" gradientUnits="userSpaceOnUse">
         <stop offset="0" stopColor="#833AB4"/>
         <stop offset="0.5" stopColor="#FD1D1D"/>
         <stop offset="1" stopColor="#FCB045"/>
       </linearGradient>
     </defs>
-    <path fill="url(#instaGradient)" d="M12 0C8.74 0 8.33.015 7.05.073 5.77.132 4.9.336 4.14.63c-.78.3-1.45.71-2.12 1.38-.67.67-1.08 1.34-1.38 2.12-.3.76-.5 1.63-.56 2.91C.015 8.33 0 8.74 0 12c0 3.26.015 3.67.073 4.95.059 1.28.261 2.15.56 2.91.3.78.71 1.45 1.38 2.12.67.67 1.34 1.08 2.12 1.38.76.3 1.63.5 2.91.56 1.28.058 1.69.073 4.95.073 3.26 0 3.67-.015 4.95-.073 1.28-.059 2.15-.261 2.91-.56.78-.3 1.45-.71 2.12-1.38.67-.67 1.08-1.34 1.38-2.12.3-.76.5-1.63.56-2.91.058-1.28.073-1.69.073-4.95 0-3.26-.015-3.67-.073-4.95-.059-1.28-.261-2.15-.56-2.91-.3-.78-.71-1.45-1.38-2.12-.67-.67-1.34-1.08-2.12-1.38-.76-.3-1.63-.5-2.91-.56C15.67.015 15.26 0 12 0zm0 2.16c3.2 0 3.58.012 4.85.07 1.17.054 1.8.249 2.22.412.56.216.96.474 1.38.894.42.42.678.82.894 1.38.163.42.358 1.05.412 2.22.058 1.27.07 1.65.07 4.85s-.012 3.58-.07 4.85c-.054 1.17-.249 1.8-.412 2.22-.216.56-.474.96-.894 1.38-.42.42-.82.678-1.38.894-.42.163-1.05.358-2.22.412-1.27.058-1.65.07-4.85.07s-3.58-.012-4.85-.07c-1.17-.054-1.8-.249-2.22-.412-.56-.216-.96-.474-1.38-.894-.42-.42-.678-.82-.894-1.38-.163-.42-.358-1.05-.412-2.22C2.172 15.58 2.16 15.2 2.16 12s.012-3.58.07-4.85c.054-1.17.249-1.8.412-2.22.216-.56.474-.96.894-1.38.42-.42.82-.678 1.38-.894.42-.163 1.05-.358 2.22-.412 1.27-.058 1.65-.07 4.85-.07zM12 5.84a6.16 6.16 0 100 12.32 6.16 6.16 0 000-12.32zm0 10.16a4 4 0 110-8 4 4 0 010 8zm6.4-10.42a1.44 1.44 0 100 2.88 1.44 1.44 0 000-2.88z"/>
+    <path fill="url(#instaIconGrad)" d="M12 0C8.74 0 8.33.015 7.05.073 5.77.132 4.9.336 4.14.63c-.78.3-1.45.71-2.12 1.38-.67.67-1.08 1.34-1.38 2.12-.3.76-.5 1.63-.56 2.91C.015 8.33 0 8.74 0 12c0 3.26.015 3.67.073 4.95.059 1.28.261 2.15.56 2.91.3.78.71 1.45 1.38 2.12.67.67 1.34 1.08 2.12 1.38.76.3 1.63.5 2.91.56 1.28.058 1.69.073 4.95.073 3.26 0 3.67-.015 4.95-.073 1.28-.059 2.15-.261 2.91-.56.78-.3 1.45-.71 2.12-1.38.67-.67 1.08-1.34 1.38-2.12.3-.76.5-1.63.56-2.91.058-1.28.073-1.69.073-4.95 0-3.26-.015-3.67-.073-4.95-.059-1.28-.261-2.15-.56-2.91-.3-.78-.71-1.45-1.38-2.12-.67-.67-1.34-1.08-2.12-1.38-.76-.3-1.63-.5-2.91-.56C15.67.015 15.26 0 12 0zm0 2.16c3.2 0 3.58.012 4.85.07 1.17.054 1.8.249 2.22.412.56.216.96.474 1.38.894.42.42.678.82.894 1.38.163.42.358 1.05.412 2.22.058 1.27.07 1.65.07 4.85s-.012 3.58-.07 4.85c-.054 1.17-.249 1.8-.412 2.22-.216.56-.474.96-.894 1.38-.42.42-.82.678-1.38.894-.42.163-1.05.358-2.22.412-1.27.058-1.65.07-4.85.07s-3.58-.012-4.85-.07c-1.17-.054-1.8-.249-2.22-.412-.56-.216-.96-.474-1.38-.894-.42-.42-.678-.82-.894-1.38-.163-.42-.358-1.05-.412-2.22C2.172 15.58 2.16 15.2 2.16 12s.012-3.58.07-4.85c.054-1.17.249-1.8.412-2.22.216-.56.474-.96.894-1.38.42-.42.82-.678 1.38-.894.42-.163 1.05-.358 2.22-.412 1.27-.058 1.65-.07 4.85-.07zM12 5.84a6.16 6.16 0 100 12.32 6.16 6.16 0 000-12.32zm0 10.16a4 4 0 110-8 4 4 0 010 8zm6.4-10.42a1.44 1.44 0 100 2.88 1.44 1.44 0 000-2.88z"/>
   </svg>
 );
 
@@ -37,7 +37,7 @@ export const WhatsAppIcon = ({ size = 20 }) => (
   </svg>
 );
 
-export const MessengerIcon = ({ size = 16 }) => (
+export const MessengerIcon = ({ size = 20 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <linearGradient id="msgGradient" x1="12" y1="0" x2="12" y2="24" gradientUnits="userSpaceOnUse">
@@ -50,22 +50,51 @@ export const MessengerIcon = ({ size = 16 }) => (
   </svg>
 );
 
-export const IGDirectIcon = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-    <line x1="22" y1="2" x2="11" y2="13"></line>
-    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+export const IGDirectIcon = ({ size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="instaIconGradDirect" x1="12" y1="0" x2="12" y2="24" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stopColor="#833AB4"/>
+        <stop offset="0.5" stopColor="#FD1D1D"/>
+        <stop offset="1" stopColor="#FCB045"/>
+      </linearGradient>
+    </defs>
+    <path fill="url(#instaIconGradDirect)" d="M12 0C5.373 0 0 4.974 0 11.111c0 3.491 1.745 6.608 4.473 8.564V24l4.091-2.245c1.103.306 2.27.467 3.436.467 6.627 0 12-4.974 12-11.111C24 4.974 18.627 0 12 0zm1.255 14.821l-3.085-3.292-6.023 3.292 6.623-7.031 3.161 3.292 5.947-3.292-6.623 7.031z"/>
   </svg>
 );
 
-export const FBCommentIcon = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className="text-[#898F9C]">
-    <path d="M18 10h-8a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2zm-2 4h-6a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2zm4-10H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h2l4 4 4-4h4c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14h-4.8L12 19.2 10.8 18H4V6h16v12z"/>
+export const FBCommentIcon = ({ size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+    <path fill="white" d="M18 10h-8a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2zm-2 4h-6a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2z" />
   </svg>
 );
 
-export const IGCommentIcon = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+export const IGCommentIcon = ({ size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="instaIconGradComment" x1="12" y1="0" x2="12" y2="24" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stopColor="#833AB4"/>
+        <stop offset="0.5" stopColor="#FD1D1D"/>
+        <stop offset="1" stopColor="#FCB045"/>
+      </linearGradient>
+    </defs>
+    <path fill="url(#instaIconGradComment)" d="M12 0C15.26 0 15.67.015 16.95.073c1.28.059 2.15.263 2.91.557.78.3 1.45.71 2.12 1.38.67.67 1.08 1.34 1.38 2.12.3.76.5 1.63.56 2.91C23.985 8.33 24 8.74 24 12s-.015 3.67-.073 4.95c-.059 1.28-.263 2.15-.557 2.91-.3.78-.71 1.45-1.38 2.12-.67.67-1.34 1.08-2.12 1.38-.76.3-1.63.5-2.91.56-1.28.058-1.69.073-4.95.073s-3.67-.015-4.95-.073c-1.28-.059-2.15-.263-2.91-.557-.78-.3-1.45-.71-2.12-1.38-.67-.67-1.08-1.34-1.38-2.12-.3-.76-.5-1.63-.56-2.91C.015 15.67 0 15.26 0 12s.015-3.67.073-4.95c.059-1.28.263-2.15.557-2.91.3-.78.71-1.45 1.38-2.12.67-.67 1.34-1.08 2.12-1.38.76-.3 1.63-.5 2.91-.56C8.33.015 8.74 0 12 0z"/>
+    <path fill="white" d="M12 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zm0 10.162a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+  </svg>
+);
+
+export const SocialHubIcon = ({ size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="hubIconGrad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stopColor="#006AFF"/>
+        <stop offset="1" stopColor="#A033FF"/>
+      </linearGradient>
+    </defs>
+    <circle cx="12" cy="12" r="11" fill="url(#hubIconGrad)" fillOpacity="0.2" stroke="url(#hubIconGrad)" strokeWidth="2"/>
+    <path d="M12 7l-1 2h2l-1-2zm-3 4l-2 1v-2l2 1zm6 0l2 1v-2l-2 1zm-3 4l1-2h-2l1 2z" fill="white" />
+    <path d="M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" fill="white" />
   </svg>
 );
 
@@ -136,9 +165,16 @@ export const ArchitectIcon = ({ size = 16 }) => (
 );
 
 export const SocialSuiteIcon = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#8B5CF6]">
-    <rect x="2" y="2" width="20" height="20" rx="4" />
-    <path d="M22 2L11 13" />
-    <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="suiteGradient" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stopColor="#006AFF"/>
+        <stop offset="1" stopColor="#A033FF"/>
+      </linearGradient>
+    </defs>
+    <rect x="2" y="2" width="20" height="20" rx="6" fill="url(#suiteGradient)" fillOpacity="0.1" stroke="url(#suiteGradient)" strokeWidth="2"/>
+    <path d="M12 6c-3.314 0-6 2.686-6 6s2.686 6 6 6 6-2.686 6-6-2.686-6-6-6z" fill="url(#suiteGradient)" fillOpacity="0.2"/>
+    <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z" fill="url(#suiteGradient)"/>
+    <circle cx="12" cy="12" r="1.5" fill="white"/>
   </svg>
 );

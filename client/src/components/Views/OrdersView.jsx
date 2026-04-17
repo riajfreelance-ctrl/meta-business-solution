@@ -17,18 +17,22 @@ const OrdersView = ({ isDarkMode, t, orders = [] }) => {
         </div>
         
         <div className="flex items-center gap-4 w-full md:w-auto overflow-x-auto scrollbar-none pb-2">
-          <div className={`px-5 py-3 rounded-[2rem] border flex items-center gap-3 shrink-0 ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white border-black/5 shadow-lg'}`}>
-            <ShoppingCart size={16} className="text-prime-500" />
+          <div className="glass-card px-6 py-4 flex items-center gap-4 shrink-0 transition-all hover:scale-105">
+            <div className="w-10 h-10 rounded-xl bg-prime-500/20 flex items-center justify-center text-prime-400">
+              <ShoppingCart size={20} />
+            </div>
             <div className="flex flex-col">
-              <span className="text-[10px] font-black uppercase tracking-widest leading-none text-prime-500">Pipeline</span>
-              <span className="text-sm font-black">{orders.length} ACTIVE</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-500">Pipeline</span>
+              <span className="text-lg font-black text-white">{orders.length} ACTIVE</span>
             </div>
           </div>
-          <div className={`px-5 py-3 rounded-[2rem] border flex items-center gap-3 shrink-0 ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white border-black/5 shadow-lg'}`}>
-            <CheckCircle size={16} className="text-green-500" />
+          <div className="glass-card px-6 py-4 flex items-center gap-4 shrink-0 transition-all hover:scale-105">
+            <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center text-green-400">
+              <CheckCircle size={20} />
+            </div>
             <div className="flex flex-col">
-              <span className="text-[10px] font-black uppercase tracking-widest leading-none text-green-500">Revenue</span>
-              <span className="text-sm font-black">
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-500">Revenue</span>
+              <span className="text-lg font-black text-white">
                 ৳{orders.reduce((acc, o) => acc + (o.totals?.total || 0), 0)}
               </span>
             </div>
@@ -55,10 +59,12 @@ const OrdersView = ({ isDarkMode, t, orders = [] }) => {
             return (
               <div 
                 key={order.id}
-                className={`p-8 rounded-[3rem] border group transition-all duration-700 relative overflow-hidden ${
-                  isDarkMode ? 'bg-[#0a0f1d] border-white/10 hover:border-prime-500/50' : 'bg-white border-black/5 shadow-2xl'
-                }`}
+                className="glass-card p-8 group transition-all duration-700 relative overflow-hidden dark border-dashed"
               >
+                {/* Neon Status Glow Background */}
+                <div className={`absolute -top-24 -right-24 w-48 h-48 blur-[100px] opacity-20 pointer-events-none transition-all duration-700 ${
+                  ['Draft', 'Pending'].includes(order.status) ? 'bg-amber-500' : 'bg-blue-500'
+                }`} />
                 {/* Visual Accent */}
                 <div className="absolute top-0 right-0 w-32 h-32 bg-prime-500/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-prime-500/10 transition-all duration-1000" />
                 
@@ -78,10 +84,15 @@ const OrdersView = ({ isDarkMode, t, orders = [] }) => {
                       </div>
                     </div>
                   </div>
-                  <div className={`px-5 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${
-                    ['Draft', 'Pending'].includes(order.status) ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' : 'bg-blue-500/10 border-blue-500/20 text-blue-500 animate-pulse'
+                  <div className={`relative px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${
+                    ['Draft', 'Pending'].includes(order.status) 
+                      ? 'bg-amber-500/20 border-amber-500/30 text-amber-500' 
+                      : 'bg-blue-500/20 border-blue-500/30 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.5)]'
                   }`}>
-                    {order.status}
+                    <span className="relative z-10">{order.status}</span>
+                    {['Draft', 'Pending'].includes(order.status) ? null : (
+                      <span className="absolute inset-0 bg-blue-500/20 animate-pulse rounded-full" />
+                    )}
                   </div>
                 </div>
 

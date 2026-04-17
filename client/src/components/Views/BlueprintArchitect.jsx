@@ -17,6 +17,9 @@ const BlueprintArchitect = ({ isDarkMode, t }) => {
   const [socials, setSocials] = useState({ fb: '', ig: '', wa: '' });
   const [payments, setPayments] = useState(['bKash', 'Cash on Delivery']);
   const [delivery, setDelivery] = useState({ insideDhaka: '2-3 Days', outsideDhaka: '3-5 Days' });
+  const [flowRules, setFlowRules] = useState([
+    { id: '1', condition: { type: 'keyword', value: 'hello' }, action: { type: 'reply', value: 'Hi there! How can I help you today?' } }
+  ]);
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -34,6 +37,7 @@ const BlueprintArchitect = ({ isDarkMode, t }) => {
       if (b.socials) setSocials(b.socials);
       if (b.payments) setPayments(b.payments);
       if (b.delivery) setDelivery(b.delivery);
+      if (b.flowRules) setFlowRules(b.flowRules);
     }
   }, [brandData?.blueprint]);
 
@@ -52,8 +56,9 @@ const BlueprintArchitect = ({ isDarkMode, t }) => {
         socials,
         payments,
         delivery,
+        flowRules,
         updatedAt: new Date(),
-        version: '1.4.0'
+        version: '1.5.0'
       };
 
       await updateDoc(doc(db, "brands", activeBrandId), {
@@ -63,7 +68,7 @@ const BlueprintArchitect = ({ isDarkMode, t }) => {
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
-        if (step < 10) setStep(prev => prev + 1);
+        if (step < 11) setStep(prev => prev + 1);
       }, 1000);
     } catch (error) {
       console.error("Error saving blueprint:", error);
@@ -82,6 +87,24 @@ const BlueprintArchitect = ({ isDarkMode, t }) => {
     setPriorityFAQs(prev => 
       prev.includes(faq) ? prev.filter(f => f !== faq) : [...prev, faq]
     );
+  };
+
+  const addFlowRule = () => {
+    setFlowRules([...flowRules, { 
+      id: Date.now().toString(), 
+      condition: { type: 'keyword', value: '' }, 
+      action: { type: 'reply', value: '' } 
+    }]);
+  };
+
+  const updateFlowRule = (id, field, nestedField, value) => {
+    setFlowRules(flowRules.map(rule => 
+      rule.id === id ? { ...rule, [field]: { ...rule[field], [nestedField]: value } } : rule
+    ));
+  };
+
+  const deleteFlowRule = (id) => {
+    setFlowRules(flowRules.filter(rule => rule.id !== id));
   };
 
   const renderStep = () => {
@@ -335,8 +358,79 @@ const BlueprintArchitect = ({ isDarkMode, t }) => {
               <div className="text-xs text-gray-500">TONE: <span className="text-white font-bold">{tone}</span></div>
               <div className="text-xs text-gray-500">DELAY: <span className="text-white font-bold">{delay}</span></div>
               <div className="text-xs text-gray-500">LANGUAGE: <span className="text-white font-bold">{languageMode}</span></div>
-              <div className="text-xs text-gray-500">PAYMENT: <span className="text-white font-bold">{payments.length} Enabled</span></div>
+              <div className="text-xs text-gray-500">RULES: <span className="text-white font-bold">{flowRules.length} Active</span></div>
             </div>
+          </section>
+        );
+      case 11:
+        return (
+          <section className="space-y-6 animate-in slide-in-from-right duration-300">
+            <label className="text-xl font-bold flex items-center gap-3 text-prime-400">
+              11. Visual Auto-Reply Flow Builder
+            </label>
+            <p className="text-gray-400 text-sm">Create conditional logic for your AI. Define what happens when specific words are detected.</p>
+            
+            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin">
+              {flowRules.map((rule, idx) => (
+                <div key={rule.id} className="relative p-6 rounded-[2rem] bg-white/5 border border-white/10 group/rule animate-in fade-in slide-in-from-bottom-2">
+                  <div className="flex flex-col md:flex-row items-center gap-6">
+                    {/* Condition Node */}
+                    <div className="flex-1 w-full space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase text-prime-400 tracking-widest">When the user says</span>
+                        <div className="h-px flex-1 bg-prime-500/20 mx-4" />
+                      </div>
+                      <div className="relative">
+                        <input 
+                          type="text" 
+                          value={rule.condition.value}
+                          onChange={(e) => updateFlowRule(rule.id, 'condition', 'value', e.target.value)}
+                          placeholder="e.g. price, cost, return"
+                          className="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-sm focus:border-prime-500 outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Bridge Icon */}
+                    <div className="shrink-0 scale-150 text-prime-500/30">
+                      <span className="hidden md:block">→</span>
+                      <span className="md:hidden">↓</span>
+                    </div>
+
+                    {/* Action Node */}
+                    <div className="flex-1 w-full space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase text-purple-400 tracking-widest">AI should reply</span>
+                        <div className="h-px flex-1 bg-purple-500/20 mx-4" />
+                      </div>
+                      <div className="relative">
+                        <textarea 
+                          value={rule.action.value}
+                          onChange={(e) => updateFlowRule(rule.id, 'action', 'value', e.target.value)}
+                          placeholder="Type response text..."
+                          className="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-sm h-20 resize-none focus:border-purple-500 outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Delete Rule */}
+                  <button 
+                    onClick={() => deleteFlowRule(rule.id)}
+                    className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-red-500/20 text-red-500 border border-red-500/20 flex items-center justify-center opacity-0 group-hover/rule:opacity-100 transition-opacity hover:bg-red-500 hover:text-white"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button 
+              onClick={addFlowRule}
+              className="w-full py-4 rounded-2xl border border-dashed border-white/20 text-gray-400 hover:border-prime-500 hover:text-prime-400 transition-all font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2"
+            >
+              + Add Logic Rule
+            </button>
           </section>
         );
       default:
@@ -353,11 +447,11 @@ const BlueprintArchitect = ({ isDarkMode, t }) => {
         </div>
         <div className="text-right">
           <div className="flex gap-1 mb-2">
-            {[...Array(10)].map((_, i) => (
+            {[...Array(11)].map((_, i) => (
               <div key={i} className={`h-1.5 w-6 rounded-full transition-all ${i + 1 <= step ? 'bg-prime-500 shadow-[0_0_10px_rgba(var(--prime-rgb),0.5)]' : 'bg-white/10'}`} />
             ))}
           </div>
-          <div className="text-gray-500 font-black text-[10px] tracking-[0.2em]">CONFIGURATION {Math.round((step/10)*100)}%</div>
+          <div className="text-gray-500 font-black text-[10px] tracking-[0.2em]">CONFIGURATION {Math.round((step/11)*100)}%</div>
         </div>
       </div>
 
@@ -387,7 +481,7 @@ const BlueprintArchitect = ({ isDarkMode, t }) => {
             disabled={isSaving || showSuccess}
             className="btn-primary px-12 py-4 rounded-2xl flex items-center gap-3 font-black uppercase tracking-widest text-sm shadow-2xl shadow-prime-500/20 active:scale-95 transition-all"
           >
-            {isSaving ? 'Processing...' : step === 10 ? 'Finalize' : 'Lock & Next'}
+            {isSaving ? 'Processing...' : step === 11 ? 'Finalize' : 'Lock & Next'}
             <Activity size={18} className={isSaving ? 'animate-spin' : ''} />
           </button>
         </div>

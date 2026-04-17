@@ -36,7 +36,8 @@ import {
   SocialSuiteIcon,
   FBCommentIcon,
   IGDirectIcon,
-  IGCommentIcon
+  IGCommentIcon,
+  SocialHubIcon
 } from './components/Icons';
 import InboxFilterBar from './components/Inbox/InboxFilterBar';
 import InboxList from './components/Inbox/InboxList';
@@ -436,12 +437,36 @@ const Dashboard = () => {
       icon: SocialSuiteIcon, 
       label: 'social_suite',
       sub: [
-        { id: 'all_social', label: 'all_conversations', icon: Activity, category: 'All' },
-        { id: 'fb_inbox', label: 'inbox', icon: MessengerIcon, category: 'Facebook' },
-        { id: 'fb_comments', label: 'comments', icon: FBCommentIcon, category: 'Facebook' },
-        { id: 'ig_inbox', label: 'inbox', icon: IGDirectIcon, category: 'Instagram' },
-        { id: 'ig_comments', label: 'comments', icon: IGCommentIcon, category: 'Instagram' },
-        { id: 'wa_inbox', label: 'inbox', icon: WhatsAppIcon, category: 'WhatsApp' },
+        { id: 'all_social', label: 'all_conversations', icon: SocialHubIcon },
+        { 
+          id: 'facebook_group', 
+          label: 'Facebook', 
+          icon: FacebookIcon, 
+          isGroup: true,
+          items: [
+            { id: 'fb_inbox', label: 'inbox', icon: MessengerIcon },
+            { id: 'fb_comments', label: 'comments', icon: FBCommentIcon }
+          ]
+        },
+        { 
+          id: 'instagram_group', 
+          label: 'Instagram', 
+          icon: InstagramIcon, 
+          isGroup: true,
+          items: [
+            { id: 'ig_inbox', label: 'inbox', icon: IGDirectIcon },
+            { id: 'ig_comments', label: 'comments', icon: IGCommentIcon }
+          ]
+        },
+        { 
+          id: 'whatsapp_group', 
+          label: 'WhatsApp', 
+          icon: WhatsAppIcon, 
+          isGroup: true,
+          items: [
+            { id: 'wa_inbox', label: 'inbox', icon: WhatsAppIcon }
+          ]
+        }
       ]
     },
     { 
@@ -749,16 +774,13 @@ const Dashboard = () => {
   }
 
   return (
-    <div className={`h-screen flex transition-all duration-300 relative overflow-hidden ${
-      isDarkMode ? 'bg-[#020617] text-slate-200' : 'bg-slate-50 text-slate-900'
+    <div className={`edge-to-edge-wrapper flex transition-all duration-700 ${
+      isDarkMode ? 'bg-transparent text-slate-200' : 'bg-slate-50 text-slate-900'
     }`}>
       
-      {isDarkMode && (
-        <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-prime-600/10 blur-[150px] rounded-full" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/10 blur-[150px] rounded-full" />
-        </div>
-      )}
+      {isDarkMode && <div className="mesh-bg" />}
+
+
 
       <ErrorBoundary>
         <Sidebar 
@@ -781,9 +803,9 @@ const Dashboard = () => {
         />
       </ErrorBoundary>
       
-      <main className={`flex-1 flex flex-col relative z-10 transition-all duration-700 ${activeTab === 'fb_inbox' ? 'p-0 overflow-hidden' : 'p-8 overflow-y-auto'}`} onScroll={handleScroll}>
+      <main className={`flex-1 flex flex-col relative z-10 transition-all duration-700 ${['fb_inbox', 'ig_inbox', 'wa_inbox', 'all_social', 'fb_comments', 'ig_comments'].includes(activeTab) ? 'p-0 overflow-hidden' : 'p-8 overflow-y-auto'}`} onScroll={handleScroll}>
         <ErrorBoundary>
-          {activeTab !== 'fb_inbox' && (
+          {!['fb_inbox', 'ig_inbox', 'wa_inbox', 'all_social', 'fb_comments', 'ig_comments'].includes(activeTab) && (
             <header className="flex justify-between items-center mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
               <div>
                 <h2 className={`text-4xl font-black mb-1 tracking-tighter ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{t('system_status')} <span className="text-prime-500">.</span></h2>
@@ -803,9 +825,9 @@ const Dashboard = () => {
           
           <GlobalBanner isDarkMode={isDarkMode} />
 
-          <div className={`flex-1 flex flex-col ${activeTab === 'fb_inbox' ? 'min-h-0 h-full overflow-hidden' : ''}`}>
+          <div className={`flex-1 flex flex-col ${['fb_inbox', 'ig_inbox', 'wa_inbox', 'all_social', 'fb_comments', 'ig_comments'].includes(activeTab) ? 'min-h-0 h-full overflow-hidden' : ''}`}>
             {activeTab === 'home' && <HomeView stats={stats} t={t} isDarkMode={isDarkMode} gaps={gaps} drafts={drafts} />}
-            {activeTab === 'fb_inbox' && (
+            {['fb_inbox', 'ig_inbox', 'wa_inbox', 'all_social'].includes(activeTab) && (
               <div className="flex-1 flex flex-col min-h-0">
                 <div className="h-full flex overflow-hidden">
                    <div className="w-80 border-r border-white/5 flex flex-col shrink-0">
@@ -872,6 +894,20 @@ const Dashboard = () => {
                     onViewOrders={() => handleTabChange('orders')}
                   />
                 </div>
+              </div>
+            )}
+
+            {/* Comment Management Systems */}
+            {(activeTab === 'fb_comments' || activeTab === 'ig_comments') && (
+              <div className="flex-1 overflow-y-auto p-8 bg-slate-950/20">
+                <CommentDraftCenter 
+                  isDarkMode={isDarkMode} 
+                  t={t} 
+                  commentDrafts={commentDrafts}
+                  pendingComments={pendingComments}
+                  isSyncing={isSyncingHistory}
+                  handleSyncHistory={syncHistory}
+                />
               </div>
             )}
             {activeTab === 'products' && <ProductHub products={products} isDarkMode={isDarkMode} t={t} />}

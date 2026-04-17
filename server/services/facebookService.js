@@ -25,52 +25,83 @@ async function sendMessage(psid, response, accessToken, replyToId = null) {
     }
     try {
         await axios.post(`https://graph.facebook.com/v21.0/me/messages?access_token=${token}`, body);
-        serverLog(`Message sent to ${psid}${replyToId ? ' (Replied to ' + replyToId + ')' : ''}`);
+        serverLog(`[API_SUCCESS] Message sent to ${psid}${replyToId ? ' (Replied to ' + replyToId + ')' : ''}`);
     } catch (e) {
         const errMsg = e.response?.data?.error?.message || e.message;
-        serverLog(`Send error: ${errMsg}`);
+        const errCode = e.response?.data?.error?.code || 'UNKNOWN';
+        
+        let classification = 'OTHER_ERROR';
+        if (errCode === 10 || errCode === 2022 || errCode === 190) classification = 'PERMISSION_ERROR';
+        else if (errCode === 613 || errCode === 32 || errCode === 17) classification = 'RATE_LIMIT_ERROR';
+        else if (errCode === 'UNKNOWN') classification = 'NETWORK_TIMEOUT';
+        
+        serverLog(`[API_FAILED] [${classification}] Code ${errCode}: ${errMsg}`);
         
         // Log error to Firestore for dashboard visibility
         const { db } = require('./firestoreService');
         await db.collection('logs').add({
             type: 'send_error',
+            classification,
             psid: psid,
             error: errMsg,
             timestamp: Date.now()
         }).catch(() => {});
+        
+        throw new Error(JSON.stringify({ classification, code: errCode, message: errMsg }));
     }
 }
 
 async function replyToComment(commentId, message, accessToken) {
     const token = accessToken || PAGE_ACCESS_TOKEN;
     try {
+        serverLog(`[API_ATTEMPT] Replying to comment ${commentId}`);
         await axios.post(`https://graph.facebook.com/v21.0/${commentId}/comments?access_token=${token}`, {
             message: message
         });
-        serverLog(`Replied to comment ${commentId}`);
+        serverLog(`[API_SUCCESS] Replied to comment ${commentId}`);
     } catch (e) {
         const errMsg = e.response?.data?.error?.message || e.message;
-        serverLog(`Comment reply error: ${errMsg}`);
+        const errCode = e.response?.data?.error?.code || 'UNKNOWN';
+        
+        let classification = 'OTHER_ERROR';
+        if (errCode === 10 || errCode === 2022 || errCode === 200) classification = 'PERMISSION_ERROR';
+        else if (errCode === 613 || errCode === 32 || errCode === 17) classification = 'RATE_LIMIT_ERROR';
+        else if (errCode === 'UNKNOWN') classification = 'NETWORK_TIMEOUT';
+        
+        serverLog(`[API_FAILED] [${classification}] Code ${errCode}: ${errMsg}`);
         
         const { db } = require('./firestoreService');
         await db.collection('logs').add({
             type: 'comment_error',
             commentId,
+            classification,
             error: errMsg,
             timestamp: Date.now()
         }).catch(() => {});
+        
+        throw new Error(JSON.stringify({ classification, code: errCode, message: errMsg }));
     }
 }
 
 async function sendPrivateReply(commentId, message, accessToken) {
     const token = accessToken || PAGE_ACCESS_TOKEN;
     try {
+        serverLog(`[API_ATTEMPT] Sending Private Reply for comment ${commentId}`);
         await axios.post(`https://graph.facebook.com/v21.0/${commentId}/private_replies?access_token=${token}`, {
             message: message
         });
-        serverLog(`Sent private reply to comment ${commentId}`);
+        serverLog(`[API_SUCCESS] Sent private reply to comment ${commentId}`);
     } catch (e) {
-        serverLog(`Private reply error: ${e.response?.data?.error?.message || e.message}`);
+        const errMsg = e.response?.data?.error?.message || e.message;
+        const errCode = e.response?.data?.error?.code || 'UNKNOWN';
+        
+        let classification = 'OTHER_ERROR';
+        if (errCode === 10 || errCode === 2022 || errCode === 200) classification = 'PERMISSION_ERROR';
+        else if (errCode === 613 || errCode === 32 || errCode === 17) classification = 'RATE_LIMIT_ERROR';
+        else if (errCode === 'UNKNOWN') classification = 'NETWORK_TIMEOUT';
+        
+        serverLog(`[API_FAILED] [${classification}] Code ${errCode}: ${errMsg}`);
+        throw new Error(JSON.stringify({ classification, code: errCode, message: errMsg }));
     }
 }
 
@@ -160,7 +191,20 @@ async function markRead(psid, accessToken) {
     try {
         await axios.post(`https://graph.facebook.com/v21.0/me/messages?access_token=${token}`, body);
     } catch (e) {
-        serverLog(`Mark read error: ${e.response?.data?.error?.message || e.message}`);
+        const errMsg = e.response?.data?.error?.message || e.message;
+        serverLog(`[MARK_READ_FAILED] ${errMsg}`);
+        throw new Error(errMsg);
+    }
+}
+
+async function validatePageToken(token) {
+    try {
+        const resp = await axios.get(`https://graph.facebook.com/v21.0/me?fields=id,name&access_token=${token}`);
+        return { valid: true, ...resp.data };
+    } catch (e) {
+        const errMsg = e.response?.data?.error?.message || e.message;
+        const errCode = e.response?.data?.error?.code;
+        return { valid: false, error: errMsg, code: errCode };
     }
 }
 
@@ -237,5 +281,6 @@ module.exports = {
     markRead,
     sendCarouselMessage,
     sendMediaMessage,
-    sendSequencedMedia
+    sendSequencedMedia,
+    validatePageToken
 };
