@@ -208,7 +208,7 @@ async function checkWebhookSubscriptionStatus(pageAccessToken) {
 }
 
 async function main() {
-    const [,, pageAccessToken, verifyToken] = process.argv;
+    const [,, pageAccessToken, verifyTokenArg] = process.argv;
 
     if (!pageAccessToken) {
         console.log('❌ Usage: node webhook_resubscribe_and_fix.js <PAGE_ACCESS_TOKEN> [VERIFY_TOKEN]');
@@ -224,7 +224,7 @@ async function main() {
         console.log('   1. Go to https://developers.facebook.com/apps');
         console.log('   2. Select your app → Webhooks');
         console.log('   3. Configure Callback URL:', WEBHOOK_URL);
-        console.log('   4. Verify Token:', verifyToken || 'myapp4204');
+        console.log('   4. Verify Token:', verifyTokenArg || 'myapp4204');
         console.log('   5. Subscribe to: messages, messaging_postbacks, feed');
         process.exit(1);
     }
@@ -233,7 +233,7 @@ async function main() {
     console.log('================================================');
     console.log(`📍 Vercel URL: ${VERCEL_URL}`);
     console.log(`🔗 Webhook URL: ${WEBHOOK_URL}`);
-    console.log(`🔑 Verify Token: ${verifyToken || 'myapp4204'}`);
+    console.log(`🔑 Verify Token: ${verifyTokenArg || 'myapp4204'}`);
 
     // Step 1: Check webhook endpoint
     const endpointOk = await checkWebhookEndpoint();

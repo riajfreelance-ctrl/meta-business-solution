@@ -413,7 +413,7 @@ async function handleWebhookPost(req, res) {
                             const eventId = change.value.comment_id ? `cmt_${change.value.comment_id}` : null;
                             const cmtTask = checkIdempotencySafe(eventId).then(canProceed => {
                                 if (!canProceed) return;
-                                return trace(`${eventId}:LogicAndReply`, withTimeout(processIncomingComment(change.value, brandData), 30000, 'processComment', async () => {
+                                return trace(`${eventId}:LogicAndReply`, withTimeout(processIncomingComment(change.value, brandData), 50000, 'processComment', async () => {
                                     await db.collection("pending_comments").add({
                                         commentId: change.value.comment_id,
                                         postId: change.value.post_id,
@@ -672,6 +672,50 @@ async function processIncomingComment(commentData, brandData) {
 }
 
 async function getShuffledReply(message, brandId, postId = null) {
+    // OPTIMIZATION: Try exact/partial match first before loading all drafts
+    const lowerText = message.toLowerCase();
+    
+    // Quick keyword match - check common patterns
+    const quickChecks = [
+        { keywords: ['price', 'দাম', 'rate', 'cost', 'price ki', 'dam koto', 'dam?', 'price?'], type: 'price' },
+        { keywords: ['order', 'অর্ডার', 'buy', 'কিনতে চাই', 'নিতে চাই', 'order korbo', 'oder', 'কিনব'], type: 'order' },
+        { keywords: ['delivery', 'ডেলিভারি', 'কতদিন', 'কত দিন', 'কখন পাব', 'delivery charge', 'shipping'], type: 'delivery' },
+        { keywords: ['available', 'আছে', 'stock', 'পাওয়া যাবে', 'stock ache', 'in stock', 'পাবো', 'পাওয়া যায়'], type: 'available' },
+        { keywords: ['discount', 'ছাড়', 'offer', 'অফার', 'কমানো যাবে', 'কম', 'combo', 'deal'], type: 'discount' },
+        { keywords: ['original', 'আসল', 'fake', 'নকল', 'real', 'authentic', 'genuine', 'quality'], type: 'original' },
+        { keywords: ['return', 'রিটার্ন', 'exchange', 'ফেরত', 'বদলে', 'refund', 'problem', 'সমস্যা'], type: 'return' }
+    ];
+    
+    for (const check of quickChecks) {
+        if (check.keywords.some(kw => lowerText.includes(kw))) {
+            // Found keyword - now load drafts for this type
+            serverLog(`[Fast Match] Keyword "${check.type}" detected in: ${message}`);
+            const snapshot = await db.collection("comment_drafts")
+                .where("brandId", "==", brandId)
+                .limit(50)
+                .get();
+            
+            const drafts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            // Find matching draft
+            for (const draft of drafts) {
+                if (draft.postId && draft.postId !== postId) continue;
+                const hasKeyword = (draft.keywords || []).some(kw => 
+                    kw.toLowerCase() === check.type || 
+                    check.keywords.some(ck => kw.toLowerCase().includes(ck) || ck.includes(kw.toLowerCase()))
+                );
+                
+                if (hasKeyword && draft.variations && draft.variations.length > 0) {
+                    const index = Math.floor(Math.random() * draft.variations.length);
+                    serverLog(`[Fast Match ✅] Found draft for "${check.type}"`);
+                    return { variation: draft.variations[index], draftId: draft.id, index };
+                }
+            }
+        }
+    }
+    
+    // Fallback: Full fuzzy matching if quick check fails
+    serverLog(`[Fuzzy Match] No quick match, trying fuzzy search for: ${message}`);
     const snapshot = await db.collection("comment_drafts").where("brandId", "==", brandId).get();
     const drafts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
@@ -698,7 +742,6 @@ async function getShuffledReply(message, brandId, postId = null) {
     }
 
     // 2. Fuzzy Matching for Comments (Global Rules)
-    const lowerText = message.toLowerCase();
     const normalizedInput = normalizePhonetic(lowerText);
     const cleanedInput = cleanNoise(lowerText);
 
