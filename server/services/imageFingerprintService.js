@@ -7,13 +7,18 @@ const { serverLog } = require('../utils/logger');
  */
 function generatePHash(imageUrl) {
     return new Promise((resolve) => {
-        imageHash(imageUrl, 16, true, (error, data) => {
-            if (error) {
-                serverLog(`[pHash Error]: ${error.message} for URL: ${imageUrl}`);
-                return resolve(null);
-            }
-            resolve(data);
-        });
+        try {
+            imageHash(imageUrl, 16, true, (error, data) => {
+                if (error) {
+                    serverLog(`[pHash Error]: ${error.message} for URL: ${imageUrl}`);
+                    return resolve(null);
+                }
+                resolve(data);
+            });
+        } catch (err) {
+            serverLog(`[pHash Crash]: ${err.message}`);
+            resolve(null);
+        }
     });
 }
 

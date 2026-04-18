@@ -13,7 +13,7 @@
 
 const axios = require('axios');
 
-const VERCEL_URL = 'https://metasolution-pc0qogiqj-riajfreelance-ctrls-projects.vercel.app';
+const VERCEL_URL = 'https://metasolution-rho.vercel.app';
 const WEBHOOK_URL = `${VERCEL_URL}/webhook`;
 const FB_API_VERSION = 'v21.0';
 

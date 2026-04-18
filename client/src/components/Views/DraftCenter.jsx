@@ -328,9 +328,9 @@ const DraftCenter = ({
                activeTab === 'pending' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-gray-500 hover:text-gray-300'
              }`}
            >
-             Suggestions
+             Pending
              {drafts.filter(d => d.status === 'pending').length > 0 && (
-               <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+               <span className="ml-1 px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[8px] font-bold">{drafts.filter(d => d.status === 'pending').length}</span>
              )}
            </button>
            <button 
@@ -454,6 +454,11 @@ const DraftCenter = ({
                         {draft.type === 'auto_learned' && (
                           <span className="bg-prime-500/10 text-prime-400 px-1.5 py-0.5 rounded border border-prime-500/20 text-[7px] font-black uppercase tracking-widest">
                             Auto-Learned
+                          </span>
+                        )}
+                        {draft.type === 'moderator_learned' && (
+                          <span className="bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/20 text-[7px] font-black uppercase tracking-widest flex items-center gap-1">
+                            👤 Moderator
                           </span>
                         )}
                         {draft.imageHashes && draft.imageHashes.length > 0 && (

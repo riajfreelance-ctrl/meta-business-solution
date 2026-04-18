@@ -168,7 +168,8 @@ export const useMetaChat = (scrollToBottom, isSelectMode, selectedConvoIds, setS
         const msgData = {
           text, attachments, productCard, type: 'sent', brandId: activeBrandId,
           timestamp: nowMs,
-          time: timeStr
+          time: timeStr,
+          isModeratorReply: true  // IMPORTANT: Mark as moderator reply for draft creation
         };
         if (replyTo) {
           msgData.replyTo = { id: replyTo.id, text: replyTo.text, type: replyTo.type };

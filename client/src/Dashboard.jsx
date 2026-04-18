@@ -64,6 +64,7 @@ import GlobalBanner from './components/Shared/GlobalBanner';
 import BillingView from './components/Views/BillingView';
 import AuthView from './components/Views/AuthView';
 import CategoryHub from './components/Views/CategoryHub';
+import MediaBrowser from './components/Views/MediaBrowser';
 
 // Import Hooks
 import { useMetaChat } from './hooks/useMetaChat';
@@ -488,7 +489,8 @@ const Dashboard = () => {
         { id: 'drafts', label: 'draft_center', icon: FileText },
         { id: 'gaps', label: 'knowledge_gaps', icon: AlertCircle },
         { id: 'library', label: 'knowledge_base', icon: BookOpen },
-        { id: 'architect', label: 'blueprint_architect', icon: Cpu }
+        { id: 'architect', label: 'blueprint_architect', icon: Cpu },
+        { id: 'media_browser', label: 'media_browser', icon: Image }
       ]
     },
     ...((role === 'super-admin') ? [{ id: 'admin', icon: ShieldCheck, label: 'admin' }] : []),
@@ -935,6 +937,7 @@ const Dashboard = () => {
             />}
             {activeTab === 'library' && <KnowledgeBase library={library} isDarkMode={isDarkMode} t={t} />}
             {activeTab === 'architect' && <BlueprintArchitect brandData={brandData} isDarkMode={isDarkMode} t={t} />}
+            {activeTab === 'media_browser' && <MediaBrowser brandId={brandData?.id} />}
             {activeTab === 'admin' && role === 'super-admin' && <SuperAdminPanel isDarkMode={isDarkMode} t={t} />}
             
             {/* Main Category Hubs */}
