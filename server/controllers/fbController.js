@@ -44,8 +44,131 @@ const { indexBrandProducts, findProductByPHash } = require('../services/productF
 // --- PHASE 2: MULTI-MESSAGE ACCUMULATOR ---
 // Debounces rapid-fire messages into a single conversational thread
 const messageAccumulator = new Map();
+const ACCUMULATOR_TIMEOUT = 2000; // 2 seconds wait time
 // ------------------------------------------
 let lastSuccessfulBucket = null;
+
+// ─── SMART DRAFT COMBINER ENGINE ───
+// Combines multiple draft replies into one professional response
+function combineDrafts(matchedDrafts, context = {}) {
+    if (!matchedDrafts || matchedDrafts.length === 0) return null;
+    
+    // If only 1 draft, return as-is
+    if (matchedDrafts.length === 1) {
+        return matchedDrafts[0].result;
+    }
+    
+    // Extract unique intents
+    const intents = matchedDrafts.map(d => d.keyword).filter(Boolean);
+    
+    // Smart template-based combination (NO AI)
+    let combined = '';
+    
+    // Check if greeting is present
+    const hasGreeting = intents.some(k => 
+        ['hi', 'hello', 'hey', 'greeting', 'hi', 'হ্যালো', 'আসসালামু'].some(g => 
+            k.toLowerCase().includes(g)
+        )
+    );
+    
+    // Check if price inquiry
+    const hasPrice = intents.some(k => 
+        ['price', 'দাম', 'কত টাকা', 'rate'].some(p => 
+            k.toLowerCase().includes(p)
+        )
+    );
+    
+    // Check if delivery
+    const hasDelivery = intents.some(k => 
+        ['delivery', 'ডেলিভারি', 'কয়দিন', 'কবে পাব'].some(d => 
+            k.toLowerCase().includes(d)
+        )
+    );
+    
+    // Check if payment/COD
+    const hasPayment = intents.some(k => 
+        ['cod', 'ক্যাশ', 'payment', 'বিকাশ'].some(p => 
+            k.toLowerCase().includes(p)
+        )
+    );
+    
+    // Check if order inquiry
+    const hasOrder = intents.some(k => 
+        ['order', 'অর্ডার', 'কিনতে'].some(o => 
+            k.toLowerCase().includes(o)
+        )
+    );
+    
+    // Build professional combined response
+    const parts = [];
+    
+    // Greeting
+    if (hasGreeting) {
+        const greetingDraft = matchedDrafts.find(d => 
+            ['hi', 'hello', 'greeting'].some(g => d.keyword?.toLowerCase().includes(g))
+        );
+        if (greetingDraft) {
+            parts.push(greetingDraft.result);
+        } else {
+            parts.push('হ্যালো! 👋');
+        }
+    }
+    
+    // Price info
+    if (hasPrice) {
+        const priceDraft = matchedDrafts.find(d => 
+            ['price', 'দাম'].some(p => d.keyword?.toLowerCase().includes(p))
+        );
+        if (priceDraft) {
+            parts.push(priceDraft.result);
+        }
+    }
+    
+    // Delivery info
+    if (hasDelivery) {
+        const deliveryDraft = matchedDrafts.find(d => 
+            ['delivery', 'ডেলিভারি', 'কয়দিন'].some(p => d.keyword?.toLowerCase().includes(p))
+        );
+        if (deliveryDraft) {
+            parts.push(deliveryDraft.result);
+        }
+    }
+    
+    // Payment info
+    if (hasPayment) {
+        const paymentDraft = matchedDrafts.find(d => 
+            ['cod', 'ক্যাশ', 'payment'].some(p => d.keyword?.toLowerCase().includes(p))
+        );
+        if (paymentDraft) {
+            parts.push(paymentDraft.result);
+        }
+    }
+    
+    // Order process
+    if (hasOrder) {
+        const orderDraft = matchedDrafts.find(d => 
+            ['order', 'অর্ডার'].some(p => d.keyword?.toLowerCase().includes(p))
+        );
+        if (orderDraft) {
+            parts.push(orderDraft.result);
+        }
+    }
+    
+    // If no specific intent matched, use all results
+    if (parts.length === 0) {
+        return matchedDrafts.map(d => d.result).filter(Boolean).join('\n\n');
+    }
+    
+    // Combine with proper spacing
+    let response = parts.join('\n\n');
+    
+    // Add closing line if multiple intents
+    if (parts.length >= 2) {
+        response += '\n\nআর কিছু জানতে চাইলে বলুন! 😊';
+    }
+    
+    return response;
+}
 
 // ─── DUPLICATE COMMENT REPLY PREVENTION ───
 // In-memory set to track comment IDs already replied to (clears on restart)
@@ -270,7 +393,7 @@ async function handleWebhookPost(req, res) {
                                 const eventId = webhook_event.message.mid ? `msg_${webhook_event.message.mid}` : null;
                                 const msgTask = checkIdempotencySafe(eventId).then(canProceed => {
                                     if (!canProceed) return;
-                                    return trace(`${eventId}:LogicAndReply`, withTimeout(processIncomingMessage(sender_psid, webhook_event.message, brandData, platformType), 5000, 'processMessage', async () => {
+                                    return trace(`${eventId}:LogicAndReply`, withTimeout(processIncomingMessage(sender_psid, webhook_event.message, brandData, platformType), 30000, 'processMessage', async () => {
                                         await db.collection('conversations').doc(sender_psid).set({ status: 'pending', isPriority: true, error: 'TIMEOUT' }, { merge: true }).catch(()=>{});
                                     }));
                                 });
@@ -290,7 +413,7 @@ async function handleWebhookPost(req, res) {
                             const eventId = change.value.comment_id ? `cmt_${change.value.comment_id}` : null;
                             const cmtTask = checkIdempotencySafe(eventId).then(canProceed => {
                                 if (!canProceed) return;
-                                return trace(`${eventId}:LogicAndReply`, withTimeout(processIncomingComment(change.value, brandData), 5000, 'processComment', async () => {
+                                return trace(`${eventId}:LogicAndReply`, withTimeout(processIncomingComment(change.value, brandData), 30000, 'processComment', async () => {
                                     await db.collection("pending_comments").add({
                                         commentId: change.value.comment_id,
                                         postId: change.value.post_id,
@@ -658,6 +781,109 @@ async function getShuffledReply(message, brandId, postId = null) {
     return null;
 }
 
+// ── GET ALL MATCHING DRAFTS (For Multi-Intent Detection) ──
+async function getAllMatchingDrafts(combinedMessage, brandId, convoData, maxMatches = 5) {
+    const lowerText = combinedMessage.toLowerCase();
+    const words = lowerText.split(/\s+/).filter(w => w.length > 2); // Filter short words
+    
+    serverLog(`[MULTI-INTENT] Searching for matches in: "${combinedMessage}"`);
+    
+    // Fetch all drafts and KB entries
+    const [draftSnap, kbSnap] = await Promise.all([
+        db.collection("draft_replies").where("brandId", "==", brandId).get(),
+        db.collection("knowledge_base").where("brandId", "==", brandId).get()
+    ]);
+    
+    const rejectedStatuses = ['rejected', 'disabled', 'archived'];
+    const drafts = draftSnap.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(d => !d.status || !rejectedStatuses.includes((d.status || '').toLowerCase()));
+    const kbRules = kbSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Build searchable records
+    const searchableRecords = [];
+    
+    drafts.forEach(draft => {
+        const allPhrases = new Set([
+            draft.keyword, 
+            ...(draft.variations || []), 
+            ...(draft.approvedVariations || [])
+        ]);
+        allPhrases.forEach(phrase => {
+            if (phrase) searchableRecords.push({ phrase, result: draft.result, draftId: draft.id, type: 'draft', keyword: draft.keyword });
+        });
+    });
+    
+    kbRules.forEach(rule => {
+        const allPhrases = new Set([...(rule.keywords || [])]);
+        allPhrases.forEach(phrase => {
+            if (phrase) searchableRecords.push({ phrase, result: rule.answer, ruleId: rule.id, type: 'kb', keyword: phrase });
+        });
+    });
+    
+    // Find ALL matches
+    const matchedDrafts = [];
+    const matchedPhrases = new Set();
+    
+    // Strategy 1: Direct includes match
+    searchableRecords.forEach(record => {
+        if (!record.result) return;
+        
+        const phraseLower = record.phrase.toLowerCase();
+        
+        // Check if any word matches or if phrase is included
+        const isMatch = words.some(word => phraseLower.includes(word)) || 
+                       lowerText.includes(phraseLower);
+        
+        if (isMatch && !matchedPhrases.has(record.phrase)) {
+            matchedPhrases.add(record.phrase);
+            matchedDrafts.push({
+                result: record.result,
+                draftId: record.draftId || record.ruleId,
+                keyword: record.keyword || record.phrase,
+                type: record.type,
+                score: 1.0
+            });
+        }
+    });
+    
+    // Strategy 2: Fuzzy match if less than 2 matches found
+    if (matchedDrafts.length < 2) {
+        const Fuse = require('fuse.js');
+        const fuse = new Fuse(searchableRecords, {
+            keys: ['phrase'],
+            includeScore: true,
+            threshold: 0.5,
+            ignoreLocation: true
+        });
+        
+        const results = fuse.search(lowerText);
+        
+        results.forEach(result => {
+            if (result.score <= 0.5 && !matchedPhrases.has(result.item.phrase)) {
+                matchedPhrases.add(result.item.phrase);
+                matchedDrafts.push({
+                    result: result.item.result,
+                    draftId: result.item.draftId || result.item.ruleId,
+                    keyword: result.item.keyword || result.item.phrase,
+                    type: result.item.type,
+                    score: 1 - result.score
+                });
+            }
+        });
+    }
+    
+    // Sort by score and limit
+    const topMatches = matchedDrafts
+        .sort((a, b) => b.score - a.score)
+        .slice(0, maxMatches);
+    
+    serverLog(`[MULTI-INTENT] Found ${topMatches.length} matching draft(s):`, 
+        topMatches.map(m => m.keyword).join(', '));
+    
+    return topMatches;
+}
+
 // ── DETERMINISTIC BOT: Match Approved Inbox Rules via Unified Engine ──
 async function getApprovedInboxDraft(message, brandId, convoData) {
     const lowerText = message.toLowerCase();
@@ -877,127 +1103,205 @@ async function processThreadedMessage(sender_psid, message, brandData, platformT
     try {
         serverLog(`[Inbox] Processing message from ${sender_psid}: "${message.text}"`);
 
-        // Step 1: Log incoming message to Firestore (creates/updates conversation)
-        const convoData = await logUserMessage(sender_psid, message, brandData, platformType);
-
-        // Step 2: Read automation settings — default is ALWAYS ON
-        const inboxSettings = brandData.inboxSettings || {};
-        const systemAutoReply = inboxSettings.systemAutoReply !== false; // default ON
-        const aiEnabled = (brandData.aiSettings || {}).inboxAiEnabled !== false; // default ON
-        serverLog(`[Settings] brand=${brandData.name} | systemAutoReply=${systemAutoReply} | aiEnabled=${aiEnabled}`);
-
-        // Step 3: Learning mode bypass
-        if (brandData.isLearningMode) {
-            serverLog(`[LEARNING MODE] Passive capture mode — skipping auto-reply for ${brandData.name}`);
-            await db.collection('conversations').doc(sender_psid).set({ status: 'pending', isPriority: true }, { merge: true });
+        // VERCEL FIX: setTimeout does NOT work on Vercel serverless!
+        // The function returns before the timer fires, so accumulated messages are lost.
+        // On Vercel: process every message immediately (no debouncing).
+        // On local/persistent server: use accumulator for burst message handling.
+        const isServerless = !!process.env.VERCEL;
+        
+        if (isServerless) {
+            // Serverless mode: process immediately, no accumulator
+            serverLog(`[DIRECT] Serverless mode - processing message immediately`);
+            const singleMessage = [{
+                text: message.text || '',
+                timestamp: Date.now(),
+                attachments: message.attachments || []
+            }];
+            await processAccumulatedMessages(sender_psid, singleMessage, brandData, platformType);
             return;
         }
 
-        // Step 4: Handle attachments (audio/image)
-        if (message.attachments && message.attachments.length > 0) {
-            const audioAtt = message.attachments.find(a => a.type === 'audio');
-            if (audioAtt) {
-                try {
-                    const { transcribeAudio } = require('../services/audioService');
-                    const transcription = await transcribeAudio(audioAtt.payload.url, brandData);
-                    if (transcription) {
-                        serverLog(`[VOICE] Transcribed: "${transcription}"`);
-                        message.text = transcription;
-                    }
-                } catch (audioErr) { serverLog(`[VOICE ERROR] ${audioErr.message}`); }
-            }
-
-            const imageAtt = message.attachments.find(a => a.type === 'image');
-            if (imageAtt && aiEnabled) {
-                await handleVisionResponse(sender_psid, imageAtt.payload.url, message.text || '', brandData);
-                return;
-            }
+        // --- LOCAL/PERSISTENT SERVER: Use accumulator for burst messages ---
+        const accumulatorKey = sender_psid;
+        const now = Date.now();
+        
+        if (!messageAccumulator.has(accumulatorKey)) {
+            messageAccumulator.set(accumulatorKey, {
+                messages: [],
+                timer: null,
+                firstMessageTime: now
+            });
         }
-
-        // Step 5: No text = nothing to process
-        const messageText = (message.text || '').trim();
-        if (!messageText) {
-            serverLog(`[SKIP] Empty message from ${sender_psid}`);
+        
+        const accumulator = messageAccumulator.get(accumulatorKey);
+        
+        accumulator.messages.push({
+            text: message.text || '',
+            timestamp: now,
+            attachments: message.attachments || []
+        });
+        
+        if (accumulator.timer) {
+            clearTimeout(accumulator.timer);
+        }
+        
+        serverLog(`[ACCUMULATOR] ${accumulator.messages.length} message(s) from ${sender_psid}. Waiting ${ACCUMULATOR_TIMEOUT}ms...`);
+        
+        if (accumulator.messages.length === 1) {
+            accumulator.timer = setTimeout(async () => {
+                const acc = messageAccumulator.get(accumulatorKey);
+                if (!acc || acc.messages.length === 0) return;
+                
+                const allMessages = [...acc.messages];
+                messageAccumulator.delete(accumulatorKey);
+                
+                serverLog(`[ACCUMULATOR] Processing ${allMessages.length} accumulated message(s) from ${accumulatorKey}`);
+                await processAccumulatedMessages(sender_psid, allMessages, brandData, platformType);
+            }, ACCUMULATOR_TIMEOUT);
+            
+            messageAccumulator.set(accumulatorKey, accumulator);
             return;
         }
-
-        // Step 6: Deterministic State Machine (ORDER FLOW ONLY — phone/address collection)
-        // Only intercept if user is already in an order flow state (AWAITING_PHONE / AWAITING_ADDRESS / AWAITING_CONFIRMATION)
-        const currentState = convoData.botState || 'IDLE';
-        if (currentState !== 'IDLE') {
-            const flowHandled = await handleDeterministicFlow(sender_psid, messageText, convoData, brandData)
-                .catch(e => { serverLog(`[Error] handleDeterministicFlow: ${e.message}`); return false; });
-            if (flowHandled) {
-                serverLog(`[FLOW] Order-flow state handled for ${sender_psid} (state: ${currentState})`);
-                return;
-            }
-        }
-
-        // Step 7: Passive lead capture (phone/address in message)
-        try {
-            const leadInfo = extractLeadInfo(messageText);
-            if (leadInfo.phone || leadInfo.address) {
-                serverLog(`[Lead] Phone: ${leadInfo.phone}, Address: ${leadInfo.address}`);
-                const updateData = { isLead: true };
-                if (leadInfo.phone) updateData.customerPhone = leadInfo.phone;
-                if (leadInfo.address) updateData.customerAddress = leadInfo.address;
-                await db.collection('conversations').doc(sender_psid).set(updateData, { merge: true });
-            }
-        } catch(e) { serverLog(`[Lead extract error] ${e.message}`); }
-
-        // Step 8: Angry/negative sentiment flag
-        const angryKeywords = ['angry', 'fraud', 'cheat', 'খারাপ', 'প্রতারণা', 'ঠকানো', 'refund', 'cancel', 'বাতিল'];
-        if (angryKeywords.some(k => messageText.toLowerCase().includes(k))) {
-            db.collection('conversations').doc(sender_psid).set({ isPriority: true, sentiment: 'Angry' }, { merge: true });
-            serverLog(`[SENTIMENT] Angry signal from ${sender_psid}`);
-        }
-
-        // Step 9: Auto-tag (async, non-blocking)
-        autoTagCustomer(sender_psid, brandData.id, brandData.googleAIKey).catch(() => {});
-
-        // Update top-level conversation summary for inbox list & sorting
-        const nowMs = Date.now();
-        await db.collection('conversations').doc(sender_psid).set({
-            lastMessage: messageText.substring(0, 100),
-            lastMessageTimestamp: nowMs,
-            timestamp: nowMs,
-            platform: platformType,
-            brandId: brandData.id,
-            unread: true
-        }, { merge: true });
-
-        serverLog(`[AUTO-REPLY] Starting for: "${messageText}" | Brand: ${brandData.name} (id: ${brandData.id})`);
-
-        if (systemAutoReply) {
-            // 10a: Try Draft Center match
-            const matchedReply = await getApprovedInboxDraft(messageText, brandData.id, convoData)
-                .catch(e => { serverLog(`[DRAFT ERROR] ${e.message}`); return null; });
-
-            // BUG FIX: getApprovedInboxDraft returns { text, result, draftId } — check both 'result' AND 'text'
-            const replyText = matchedReply?.result || matchedReply?.text;
-            if (matchedReply && replyText) {
-                serverLog(`[DRAFT ✅] Match found → "${replyText.substring(0, 80)}"`);
-                await sendAndLog(sender_psid, replyText, 'bot', brandData);
-                await db.collection('conversations').doc(sender_psid).set({ lastMatchedDraftId: matchedReply.draftId || null }, { merge: true });
-                return;
-            }
-            serverLog(`[DRAFT ❌] No match for: "${messageText}"`);
-
-            // 10b: AI Fallback
-            if (aiEnabled) {
-                serverLog(`[AI] Activating AI fallback for: "${messageText}"`);
-                await handleAIResponse(sender_psid, messageText, brandData);
-                return;
-            }
-        }
-
-        // 10c: No reply — mark pending
-        serverLog(`[PENDING] No handler matched. Moving to pending for: "${messageText}"`);
-        await db.collection('conversations').doc(sender_psid).set({ status: 'pending', isPriority: true }, { merge: true });
+        
+        const allMessages = [...accumulator.messages];
+        messageAccumulator.delete(accumulatorKey);
+        
+        serverLog(`[ACCUMULATOR] Immediate processing of ${allMessages.length} messages from ${accumulatorKey}`);
+        await processAccumulatedMessages(sender_psid, allMessages, brandData, platformType);
+        return;
 
     } catch (error) {
         serverLog(`[CRITICAL] processThreadedMessage failed: ${error.message}`);
         console.error('[CRITICAL] Stack:', error.stack);
+    }
+}
+
+// ─── PROCESS ACCUMULATED MESSAGES ───
+async function processAccumulatedMessages(sender_psid, messages, brandData, platformType) {
+    try {
+        // Combine all message texts
+        const combinedText = messages.map(m => m.text).filter(t => t.trim()).join(' ');
+        
+        // Collect all attachments
+        const allAttachments = messages.flatMap(m => m.attachments || []);
+        const hasAttachments = allAttachments.length > 0;
+        
+        if (!combinedText.trim() && !hasAttachments) {
+            serverLog(`[SKIP] All accumulated messages are empty from ${sender_psid}`);
+            return;
+        }
+        
+        serverLog(`[COMBINED] Processing combined message: "${combinedText || '(image/attachment)'}" | Attachments: ${allAttachments.length}`);
+        
+        // Use the first message for logging
+        const firstMessage = {
+            text: combinedText,
+            attachments: messages.flatMap(m => m.attachments || [])
+        };
+        
+        // Update conversation with combined message (DO NOT SAVE TO DATABASE - only show in inbox)
+        const nowMs = Date.now();
+        
+        // Get conversation data for matching (but don't log message yet)
+        const convoData = {
+            sender_psid,
+            brandId: brandData.id,
+            platform: platformType
+        };
+        
+        // Build lastMessage for conversation doc
+        let lastMessageForDoc = combinedText.substring(0, 100);
+        if (!lastMessageForDoc && hasAttachments) {
+            const attType = allAttachments[0]?.type || 'file';
+            lastMessageForDoc = attType === 'image' ? '📷 Image' : attType === 'audio' ? '🎤 Voice Message' : '📎 Attachment';
+        }
+        
+        await db.collection('conversations').doc(sender_psid).set({
+            lastMessage: lastMessageForDoc,
+            lastMessageTimestamp: nowMs,
+            timestamp: nowMs,
+            platform: platformType,
+            brandId: brandData.id,
+            unread: true,
+            messageCount: messages.length
+        }, { merge: true });
+        
+        // Save customer message to messages subcollection (needed for draft creation when moderator replies)
+        await db.collection(`conversations/${sender_psid}/messages`).add({
+            text: combinedText,
+            attachments: allAttachments,
+            type: 'received',
+            sender_id: sender_psid,
+            brandId: brandData.id,
+            platform: platformType,
+            timestamp: nowMs,
+            time: new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true })
+        });
+        
+        serverLog(`[AUTO-REPLY] Starting for combined: "${combinedText || '(image/attachment)'}" | Brand: ${brandData.name}`);
+        
+        // Handle image attachments - use vision response handler
+        const imageAttachment = allAttachments.find(a => a.type === 'image');
+        if (imageAttachment && imageAttachment.payload?.url) {
+            serverLog(`[IMAGE] Found image attachment, routing to vision handler`);
+            await handleVisionResponse(sender_psid, imageAttachment.payload.url, combinedText, brandData);
+            return;
+        }
+        
+        if (!combinedText.trim()) {
+            // Non-image attachment with no text - mark pending
+            serverLog(`[PENDING] Non-text attachment, marking pending`);
+            await db.collection('conversations').doc(sender_psid).set({ status: 'pending', isPriority: true }, { merge: true });
+            return;
+        }
+        
+        if (systemAutoReply) {
+            // Try to match MULTIPLE drafts for combined message
+            const matchedDrafts = await getAllMatchingDrafts(combinedText, brandData.id, convoData);
+            
+            if (matchedDrafts && matchedDrafts.length > 0) {
+                serverLog(`[DRAFT ✅] Found ${matchedDrafts.length} matching draft(s) - NOT SAVING TO DATABASE`);
+                
+                // Combine drafts intelligently (NO AI)
+                const combinedReply = combineDrafts(matchedDrafts, { messageCount: messages.length });
+                
+                if (combinedReply) {
+                    serverLog(`[COMBINED REPLY] Sending combined response (${combinedReply.length} chars)`);
+                    await sendAndLog(sender_psid, combinedReply, 'bot', brandData);
+                    
+                    // DO NOT SAVE matched conversation - only update counter
+                    await db.collection('conversations').doc(sender_psid).set({
+                        status: 'auto_replied',
+                        lastMatchedDraftIds: matchedDrafts.map(d => d.draftId).filter(Boolean),
+                        autoReplyCount: (convoData.autoReplyCount || 0) + 1
+                    }, { merge: true });
+                    
+                    serverLog(`[DRAFT MATCH] Auto-reply sent, conversation NOT saved (90% savings!)`);
+                    return;
+                }
+            }
+            
+            serverLog(`[DRAFT ❌] No draft matches found`);
+            
+            // AI Fallback (only if enabled)
+            if (aiEnabled && messages.length <= 2) {
+                serverLog(`[AI] Activating AI fallback for simple query`);
+                await handleAIResponse(sender_psid, combinedText, brandData);
+                return;
+            }
+        }
+        
+        // No reply — mark pending
+        serverLog(`[PENDING] No handler matched. Moving to pending`);
+        await db.collection('conversations').doc(sender_psid).set({ 
+            status: 'pending', 
+            isPriority: true,
+            needsHumanReply: true
+        }, { merge: true });
+        
+    } catch (error) {
+        serverLog(`[ProcessAccumulated Error] ${error.message}`);
+        console.error('[ProcessAccumulated Error]', error.stack);
     }
 }
 
@@ -1121,6 +1425,49 @@ async function handleVisionResponse(psid, imageUrl, text, brandData) {
             serverLog(`[Vision] pHash generation failed: ${hashErr.message}`);
         }
 
+        // --- PHASE 0: Media Browser Match (FASTEST - NO AI, NO TOKENS) ---
+        try {
+            const { matchImageInBrowser } = require('../services/mediaBrowserService');
+            
+            // Also do OCR for better matching (disabled on Vercel - WASM crashes serverless)
+            let ocrText = '';
+            // Tesseract OCR disabled - causes Vercel crash due to missing WASM files
+            
+            const mediaMatch = await matchImageInBrowser(brandData.id, imageUrl, ocrText);
+            
+            if (mediaMatch) {
+                serverLog(`[Media Browser HIT] ✅ Matched: "${mediaMatch.productName || mediaMatch.message?.substring(0, 30)}" (score: ${mediaMatch.matchScore})`);
+                
+                // Build reply from matched media entry
+                let reply = '';
+                const name = mediaMatch.productName || '';
+                const price = mediaMatch.productOfferPrice || mediaMatch.productPrice || '';
+                
+                if (name && price) {
+                    reply = `আপনার পাঠানো ছবিটি আমাদের "${name}" এর! ✨\n\n দাম: ${price} টাকা`;
+                    
+                    // Add variation info if available
+                    if (mediaMatch.productVariations && mediaMatch.productVariations.length > 0) {
+                        const variationList = mediaMatch.productVariations
+                            .map(v => `${v.available !== false ? '✅' : '❌'} ${v.name}${v.price ? ` - ${v.price} টাকা` : ''}`)
+                            .join('\n');
+                        reply += `\n\n📦 Variations:\n${variationList}`;
+                    }
+                    
+                    reply += '\n\nআপনি কি অর্ডার করতে চান?';
+                } else if (mediaMatch.message) {
+                    reply = mediaMatch.message;
+                }
+                
+                if (reply) {
+                    await sendAndLog(psid, reply, 'bot', brandData);
+                    return; // ZERO TOKENS! FASTEST PATH!
+                }
+            }
+        } catch (mediaErr) {
+            serverLog(`[Media Browser Error]: ${mediaErr.message}`);
+        }
+
         // --- PHASE 1: Zero-Token Product Visual Matcher ---
         if (incomingHash) {
             const productMatch = await findProductByPHash(brandData.id, incomingHash);
@@ -1158,19 +1505,19 @@ async function handleVisionResponse(psid, imageUrl, text, brandData) {
             return; // FREE!
         }
 
-        // --- PHASE 3: Context-Aware OCR Fallback ---
+        // --- PHASE 3: Context-Aware OCR Fallback (disabled - Tesseract WASM crashes Vercel) ---
         try {
-            const Tesseract = require('tesseract.js');
-            const { data: { text: ocrText } } = await Tesseract.recognize(imageUrl, 'ben+eng');
+            // Tesseract OCR disabled on Vercel serverless
+            // Instead, use preceding message context only
             
-            // Fetch preceding message context to help OCR
+            // Fetch preceding message context
             const historySnap = await db.collection(`conversations/${psid}/messages`)
                 .orderBy('timestamp', 'desc')
                 .limit(2)
                 .get();
             const precedingText = historySnap.docs.find(d => d.data().type === 'received' && d.data().text !== text)?.data()?.text || "";
             
-            const combinedContext = (precedingText + " " + (ocrText || "") + " " + (text || "")).trim();
+            const combinedContext = (precedingText + " " + (text || "")).trim();
 
             if (combinedContext.length > 5) {
                 serverLog(`[OCR Context] Combined Context: ${combinedContext}`);
@@ -1630,8 +1977,72 @@ async function handleEchoMessage(webhook_event, brandData) {
     serverLog(`[Echo - ${brandData.name}] Admin Reply to customer ${psid}: ${text}`);
 
     // --- PHASE 3: Bulk Passive Learning (External Source: Messenger/Business Suite) ---
+    // ALWAYS save the echo message first (even if blacklisted)
+    try {
+        const nowMs = Date.now();
+        const timeStr = new Date(nowMs).toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true });
+        
+        // Save the moderator's reply (from Facebook page)
+        await db.collection(`conversations/${psid}/messages`).add({
+            text: text || '',
+            type: 'sent',
+            sender_id: brandData.facebookPageId,
+            brandId: brandData.id,
+            platform: 'facebook',
+            timestamp: nowMs,
+            time: timeStr,
+            isModeratorReply: true,  // Mark as moderator reply
+            isExternalReply: true    // Mark as from Facebook page (not dashboard)
+        });
+        
+        // Update conversation
+        const convoSnap = await db.collection('conversations').doc(psid).get();
+        const currentCount = convoSnap.data()?.moderatorReplyCount || 0;
+        
+        await db.collection('conversations').doc(psid).set({
+            lastMessage: text || '',
+            lastMessageTimestamp: nowMs,
+            timestamp: nowMs,
+            unread: false,
+            status: 'replied',
+            moderatorReplyCount: currentCount + 1
+        }, { merge: true });
+        
+        serverLog(`[Echo] ✅ Moderator reply from Facebook page saved`);
+    } catch (historyError) {
+        serverLog(`[Echo History Error]: ${historyError.message}`);
+    }
+    
+    // Only create draft if NOT blacklisted
     if (shouldCaptureAsDraft(text) && !message.app_id) {
         try {
+            // First, ensure customer messages exist in the subcollection
+            // (since we don't save on auto-reply, we need to save them now)
+            const convoDoc = await db.collection('conversations').doc(psid).get();
+            const convoData = convoDoc.data() || {};
+            
+            // Check if received messages already exist
+            const checkSnap = await db.collection(`conversations/${psid}/messages`)
+                .orderBy('timestamp', 'desc')
+                .limit(15)
+                .get();
+            const receivedMsgs = checkSnap.docs.filter(d => d.data().type === 'received');
+            
+            // If no received messages found, save from conversation metadata
+            if (receivedMsgs.length === 0 && convoData.lastMessage) {
+                const nowMs = Date.now();
+                await db.collection(`conversations/${psid}/messages`).add({
+                    text: convoData.lastMessage,
+                    type: 'received',
+                    sender_id: psid,
+                    brandId: brandData.id,
+                    platform: convoData.platform || 'facebook',
+                    timestamp: nowMs - 1000,
+                    time: new Date(nowMs - 1000).toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true })
+                });
+                serverLog(`[Passive-Learn] Saved unsaved customer message: "${convoData.lastMessage}"`);
+            }
+
             const msgSnap = await db.collection(`conversations/${psid}/messages`)
                 .orderBy('timestamp', 'desc')
                 .limit(15)
@@ -1693,32 +2104,6 @@ async function handleEchoMessage(webhook_event, brandData) {
         }
     }
 
-    // --- Persist External Echo Reply in History (consistent numeric timestamp) ---
-    try {
-        const echoNowMs = Date.now();
-        await db.collection(`conversations/${psid}/messages`).add({
-            text: text || '',
-            type: 'sent',
-            sender_id: brandData.facebookPageId,
-            brandId: brandData.id,
-            platform: 'facebook',
-            timestamp: echoNowMs,
-            time: new Date(echoNowMs).toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true })
-        });
-
-        // Update parent conversation — numeric timestamp keeps inbox sort order correct
-        await db.collection('conversations').doc(psid).set({
-            lastMessage: text,
-            lastMessageTimestamp: echoNowMs,
-            timestamp: echoNowMs,
-            unread: false,
-            status: 'replied'
-        }, { merge: true });
-
-        serverLog(`[History] External echo reply persisted for ${psid}`);
-    } catch (historyError) {
-        serverLog(`[History Error]: ${historyError.message}`);
-    }
 }
 
 async function syncConversationHistory(req, res) {
@@ -1883,9 +2268,77 @@ async function sendMessageFromDashboard(req, res) {
             await logPersonaConversion(targetId);
         }
 
-        // --- PHASE 3: Bulk Auto-Learning (Staff Training) ---
+        // --- PHASE 3: MODERATOR REPLY → SAVE FOR DRAFT CREATION ---
+        // NEW POLICY: Only save when moderator manually replies (not on auto-reply)
+        // We save the customer's incoming messages HERE (when moderator replies)
+        // so that draft creation can find them in the messages subcollection
+        
+        // ALWAYS save moderator reply (even if blacklisted)
+        try {
+            const nowMs = Date.now();
+            const timeStr = new Date(nowMs).toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true });
+
+            // Save moderator reply
+            await db.collection(`conversations/${targetId}/messages`).add({
+                text: text || '',
+                type: 'sent',
+                sender_id: brandData.facebookPageId,
+                brandId: brandData.id,
+                platform: 'facebook',
+                timestamp: nowMs,
+                time: timeStr,
+                isModeratorReply: true  // Mark as moderator reply
+            });
+
+            // Update parent conversation
+            const convoSnap = await db.collection('conversations').doc(targetId).get();
+            const currentCount = convoSnap.data()?.moderatorReplyCount || 0;
+            
+            await db.collection('conversations').doc(targetId).set({
+                lastMessage: text || '',
+                lastMessageTimestamp: nowMs,
+                timestamp: nowMs,
+                unread: false,
+                status: 'replied',
+                moderatorReplyCount: currentCount + 1
+            }, { merge: true });
+            
+            serverLog(`[History] ✅ Moderator reply saved (message + reply stored for draft creation)`);
+        } catch (historyError) {
+            serverLog(`[History Error]: ${historyError.message}`);
+        }
+        
+        // Only create draft if NOT blacklisted
         if (shouldCaptureAsDraft(text)) {
             try {
+                // First, save any unsaved customer messages from this conversation
+                // (since we don't save on auto-reply, we need to ensure customer messages exist)
+                const convoDoc = await db.collection('conversations').doc(targetId).get();
+                const convoData = convoDoc.data() || {};
+                
+                // Check if customer messages are already saved
+                // Use only orderBy (no where filter) to avoid needing composite index
+                const existingMsgSnap = await db.collection(`conversations/${targetId}/messages`)
+                    .orderBy('timestamp', 'desc')
+                    .limit(15)
+                    .get();
+                const existingMsgs = existingMsgSnap.docs.filter(d => d.data().type === 'received');
+                
+                // If no received messages found, save from conversation metadata
+                if (existingMsgs.length === 0 && convoData.lastMessage) {
+                    const nowMs = Date.now();
+                    await db.collection(`conversations/${targetId}/messages`).add({
+                        text: convoData.lastMessage,
+                        type: 'received',
+                        sender_id: targetId,
+                        brandId: brandData.id,
+                        platform: convoData.platform || 'facebook',
+                        timestamp: nowMs - 1000, // 1 second before moderator reply
+                        time: new Date(nowMs - 1000).toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true })
+                    });
+                    serverLog(`[Draft-Learn] Saved unsaved customer message: "${convoData.lastMessage}"`);
+                }
+
                 // Find all 'received' messages since the last 'sent' message
                 const msgSnap = await db.collection(`conversations/${targetId}/messages`)
                     .orderBy('timestamp', 'desc')
@@ -1894,23 +2347,20 @@ async function sendMessageFromDashboard(req, res) {
                 
                 const messages = msgSnap.docs.map(d => d.data());
                 
-                // --- NEW ROBUST DETECTION ---
                 // Find the first index where a customer message (received) exists
                 const firstReceivedIdx = messages.findIndex(m => m.type === 'received');
                 
                 if (firstReceivedIdx === -1) {
-                    serverLog(`[Bulk-Learn] No received messages found in last 15. Skipping.`);
+                    serverLog(`[Draft-Learn] No received messages found in last 15. Skipping.`);
                     return;
                 }
 
-                // Now find the first 'sent' message that appears BEFORE (older than) that received message
-                // Remember: index 0 is newest, so 'before' means a HIGHER index.
+                // Find the first 'sent' message that appears before that received message
                 const lastSentIdx = messages.findIndex((m, idx) => idx > firstReceivedIdx && m.type === 'sent');
 
                 const unrepliedReceived = (lastSentIdx === -1)
                     ? messages.slice(firstReceivedIdx).filter(m => m.type === 'received')
                     : messages.slice(firstReceivedIdx, lastSentIdx).filter(m => m.type === 'received');
-                // ----------------------------
 
                 if (unrepliedReceived.length > 0) {
                     const aggregatedText = unrepliedReceived
@@ -1928,56 +2378,33 @@ async function sendMessageFromDashboard(req, res) {
                         const keyword = aggregatedText || "Image Inquiry";
                         const variations = (brandData.autoHyperIndex !== false) ? getLinguisticVariations(keyword) : [];
                         
+                        // Save as DRAFT (not conversation) - this is the new policy
                         await db.collection("draft_replies").add({
                             keyword: keyword,
                             result: text,
                             variations: variations,
                             imageHashes: imageHashes,
-                            status: 'pending',
-                            type: 'expert_learned',
+                            status: 'pending',  // Pending admin approval
+                            type: 'moderator_learned',
                             brandId: brandData.id,
                             timestamp: serverTimestamp(),
                             successCount: 0,
-                            metadata: { psid: targetId, source: 'dashboard_bulk_learn' }
+                            metadata: { 
+                                psid: targetId, 
+                                source: 'moderator_reply',
+                                moderatorReply: text,
+                                customerMessage: aggregatedText
+                            }
                         });
-                        serverLog(`[Bulk-Learn] Captured ${unrepliedReceived.length} messages for brand: ${brandId}`);
+                        
+                        serverLog(`[Draft-Learn] ✅ Message + Reply saved to Draft Center for approval`);
+                        serverLog(`[Draft-Learn] Customer: "${aggregatedText}"`);
+                        serverLog(`[Draft-Learn] Moderator: "${text}"`);
                     }
                 }
             } catch (autoLearnError) {
-                serverLog(`[Bulk-Learn Error]: ${autoLearnError.message}`);
+                serverLog(`[Draft-Learn Error]: ${autoLearnError.message}`);
             }
-        }
-
-        // --- Persist Dashboard Reply in History ---
-        // FIX: Use numeric timestamp (Date.now()) for ALL message writes
-        // Mixing Firestore Timestamp objects (serverTimestamp) with numbers in the
-        // same collection causes Firestore orderBy to silently exclude some documents.
-        try {
-            const nowMs = Date.now();
-            const timeStr = new Date(nowMs).toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true });
-
-            await db.collection(`conversations/${targetId}/messages`).add({
-                text: text || '',
-                type: 'sent',
-                sender_id: brandData.facebookPageId,
-                brandId: brandData.id,
-                platform: 'facebook',
-                timestamp: nowMs,  // FIX: numeric, consistent with all other message writes
-                time: timeStr
-            });
-
-            // Update parent conversation
-            await db.collection('conversations').doc(targetId).set({
-                lastMessage: text || '',
-                lastMessageTimestamp: nowMs,
-                timestamp: nowMs,
-                unread: false,
-                status: 'replied'
-            }, { merge: true });
-            
-            serverLog(`[History] Dashboard reply persisted for ${targetId}`);
-        } catch (historyError) {
-            serverLog(`[History Error]: ${historyError.message}`);
         }
 
         // Success log
@@ -2190,6 +2617,8 @@ module.exports = {
    proxyUpload,
    
    // Logic Engines (for testing/direct use if needed)
+   getAllMatchingDrafts,
+   combineDrafts,
    getApprovedInboxDraft,
    getShuffledReply,
    processIncomingMessage,
