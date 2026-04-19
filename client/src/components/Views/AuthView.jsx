@@ -1,143 +1,199 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layout, Rocket, ArrowRight, ShieldCheck, Zap, Globe, MessageSquare, Database, Cpu, TrendingUp, Star, ChevronRight, CheckCircle2, BarChart3, Fingerprint, Layers, Sparkles } from 'lucide-react';
+import { Cpu, Zap, Shield, TrendingUp, MessageSquare, Star, Check, ArrowRight, Sparkles, Crown, Rocket, Users, BarChart3, Clock, CheckCircle2, XCircle, ChevronDown } from 'lucide-react';
 import { useBrand } from '../../context/BrandContext';
 
-// --- Scroll Reveal Hook ---
-const useScrollReveal = () => {
-  const [revealed, setRevealed] = useState([]);
-  const [hasRevealed, setHasRevealed] = useState(new Set());
-  const observer = useRef(null);
+// --- Animated Counter Hook ---
+const useAnimatedCounter = (end, duration = 2000, startOnView = true) => {
+  const [count, setCount] = useState(0);
+  const [hasStarted, setHasStarted] = useState(!startOnView);
+  const ref = useRef(null);
 
   useEffect(() => {
-    observer.current = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting && !hasRevealed.has(entry.target.id)) {
-          setRevealed(prev => [...new Set([...prev, entry.target.id])]);
-          setHasRevealed(prev => new Set([...prev, entry.target.id]));
-        }
-      });
-    }, { threshold: 0.1 });
+    if (!startOnView) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !hasStarted) {
+        setHasStarted(true);
+      }
+    }, { threshold: 0.3 });
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [startOnView, hasStarted]);
 
-    const sections = document.querySelectorAll('.reveal-section');
-    sections.forEach(s => observer.current.observe(s));
-    return () => observer.current?.disconnect();
-  }, [hasRevealed]);
+  useEffect(() => {
+    if (!hasStarted) return;
+    let start = 0;
+    const increment = end / (duration / 16);
+    const timer = setInterval(() => {
+      start += increment;
+      if (start >= end) {
+        setCount(end);
+        clearInterval(timer);
+      } else {
+        setCount(Math.floor(start));
+      }
+    }, 16);
+    return () => clearInterval(timer);
+  }, [end, duration, hasStarted]);
 
-  return revealed;
+  return { count, ref };
 };
 
-// --- Redesigned Premium Sub-Components ---
-
-const MockLiveFeed = ({ isDarkMode }) => {
-  const logs = [
-    "সিস্টেম ইনিশিয়ালাইজড: কোর ইন্টেলিজেন্স অনলাইন",
-    "ফনেটিক ব্রিজ: ২,২০০+ বৈচিত্র্য হ্যান্ডেল করা হয়েছে",
-    "প্যাটার্ন ডিটেক্টেড: কাস্টমার লোকেশন জানতে চাচ্ছে",
-    "এআই লার্নিং: ড্রাফট তৈরি হয়েছে - 'ডেলিভারি টাইম'",
-    "হোয়াটসঅ্যাপ সিঙ্ক: ১২টি নতুন কথোপকথন প্রোসেসড",
-    "সাকসেস: হাই-কনভার্সন প্যাটার্ন আইডেন্টিফাইড"
+// --- Live Chat Demo (Enhanced) ---
+const LiveChatDemo = ({ isDarkMode }) => {
+  const messages = [
+    { type: 'user', text: 'bhai delivery charge koto?', time: '2m ago' },
+    { type: 'bot', text: 'ঢাকার মধ্যে ৬০ টাকা, ঢাকার বাইরে ১২০ টাকা। অর্ডার করবেন?', time: '2m ago', delay: 1500 },
+    { type: 'user', text: 'jio, order korbo', time: '1m ago', delay: 3000 },
+    { type: 'bot', text: '✅ অর্ডার কনফার্ম! নাম, ঠিকানা ও ফোন নম্বর দিন।', time: '1m ago', delay: 4500 },
   ];
-  return (
-    <div className={`p-6 rounded-[2.5rem] border overflow-hidden relative group/logs ${isDarkMode ? 'bg-[#0a0f1d]/40 border-white/5 shadow-2xl' : 'bg-white border-black/5 shadow-xl'}`}>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
-          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Live Engine Ops</span>
-        </div>
-      </div>
-      <div className="space-y-3 h-28 relative overflow-hidden">
-        {logs.map((log, i) => (
-          <div key={i} className="text-[10px] font-bold tracking-tight text-prime-400/90 flex items-center gap-3">
-            <div className="w-1 h-1 rounded-full bg-prime-500/30" />
-            {log}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
 
-const SectionHeader = ({ tag, tagBn, title, desc, isDarkMode, center }) => (
-  <div className={`space-y-4 mb-16 ${center ? 'text-center' : ''}`}>
-    {(tag || tagBn) && (
-      <div className={`flex flex-col ${center ? 'items-center' : 'items-start'} gap-1`}>
-         {tag && <span className="text-[10px] font-black uppercase tracking-[0.4em] text-prime-500">{tag}</span>}
-         {tagBn && <span className="text-[8px] font-bold uppercase tracking-widest text-gray-500 opacity-60">{tagBn}</span>}
-      </div>
-    )}
-    <h2 className={`text-3xl md:text-6xl font-black tracking-tight leading-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{title}<span className="text-prime-500">.</span></h2>
-    <div className={`text-base md:text-xl max-w-2xl font-medium leading-relaxed ${isDarkMode ? 'text-gray-400' : 'text-gray-500'} ${center ? 'mx-auto' : ''}`}>{desc}</div>
-  </div>
-);
-
-const LiveAutoReplySlider = ({ isDarkMode }) => {
-  const interactions = [
-    { q: "bhai delivery charge koto?", a: "ঢাকার মধ্যে ৬০ টাকা, ঢাকার বাইরে ১২০ টাকা।", tag: "Logistics" },
-    { q: "size 42 hobe naki??", a: "জি, ৪২ সাইজ এখনো স্টকে আছে। অর্ডার করতে ইনবক্স করুন।", tag: "Inventory" },
-    { q: "apnadr shop kothay?", a: "আমাদের শোরুম পান্থপথ সিগন্যালে, সিটি সেন্টারের ৪ তলায়।", tag: "Location" }
-  ];
-  const [index, setIndex] = useState(0);
-  const [showResponse, setShowResponse] = useState(false);
-  const [isMatching, setIsMatching] = useState(false);
+  const [visibleMessages, setVisibleMessages] = useState([0]);
+  const [isTyping, setIsTyping] = useState(false);
 
   useEffect(() => {
     const sequence = async () => {
-      setShowResponse(false); setIsMatching(false);
-      await new Promise(r => setTimeout(r, 2000));
-      setIsMatching(true); await new Promise(r => setTimeout(r, 600)); setIsMatching(false);
-      setShowResponse(true); await new Promise(r => setTimeout(r, 4000));
-      setIndex(prev => (prev + 1) % interactions.length);
+      for (let i = 1; i < messages.length; i++) {
+        await new Promise(r => setTimeout(r, messages[i].delay || 2000));
+        setIsTyping(true);
+        await new Promise(r => setTimeout(r, 800));
+        setIsTyping(false);
+        setVisibleMessages(prev => [...prev, i]);
+      }
+      // Reset after showing all
+      await new Promise(r => setTimeout(r, 5000));
+      setVisibleMessages([0]);
     };
     sequence();
-  }, [index]);
-
-  const current = interactions[index];
+    const interval = setInterval(sequence, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <div className="relative mt-8 max-w-lg mx-auto">
-      <div className={`relative min-h-[300px] p-8 md:p-12 rounded-[3.5rem] flex flex-col justify-between overflow-hidden shadow-2xl transition-all duration-1000 ${isDarkMode ? 'bg-[#0a0f1d]/40 border border-white/5' : 'bg-white/40 border border-black/5'}`}>
-        <div className="absolute top-0 right-0 w-32 h-32 bg-prime-500/10 blur-[80px] -z-10" />
-        <div className="space-y-8 flex flex-col relative z-10">
-          <div className="animate-in fade-in slide-in-from-left-8 duration-1000 self-start">
-            <div className={`p-5 rounded-[2rem] rounded-tl-none border ${isDarkMode ? 'bg-white/[0.03] border-white/5' : 'bg-white border-black/5'}`}>
-              <p className="text-xs md:text-sm font-medium tracking-tight opacity-90 leading-relaxed">"{current.q}"</p>
+    <div className={`relative max-w-md mx-auto rounded-3xl overflow-hidden shadow-2xl border ${isDarkMode ? 'bg-[#0a0f1d]/80 border-white/10' : 'bg-white border-black/10'}`}>
+      {/* Header */}
+      <div className={`p-4 border-b ${isDarkMode ? 'bg-gradient-to-r from-prime-600/20 to-indigo-600/20 border-white/10' : 'bg-gradient-to-r from-prime-50 to-indigo-50 border-black/5'}`}>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-prime-500 to-indigo-600 flex items-center justify-center shadow-lg">
+            <MessageSquare size={18} className="text-white" />
+          </div>
+          <div className="flex-1">
+            <h4 className={`text-sm font-black ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>MetaSolution Bot</h4>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-[9px] font-bold text-green-500 uppercase tracking-wider">Online • Auto-Replying</span>
             </div>
           </div>
-          {isMatching && (
-            <div className="flex items-center gap-3 px-6 py-2 self-center animate-pulse">
-              <div className="w-1.5 h-1.5 bg-prime-500 rounded-full" />
-              <span className="text-[10px] font-black uppercase tracking-[0.4em] text-prime-500/60">Engine Syncing</span>
-            </div>
-          )}
-          {showResponse && (
-            <div className="self-end max-w-[90%] animate-in fade-in slide-in-from-right-10 duration-1000">
-              <div className="p-6 rounded-[2.5rem] rounded-br-none border border-prime-500/20 bg-prime-500/[0.05] backdrop-blur-3xl shadow-[0_20px_50px_rgba(35,166,240,0.1)]">
-                <p className="text-xs md:text-sm font-black text-prime-400 leading-relaxed">"{current.a}"</p>
+          <Zap size={16} className="text-prime-500 animate-pulse" />
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className={`p-6 space-y-4 min-h-[320px] max-h-[320px] overflow-y-auto ${isDarkMode ? 'bg-[#020617]' : 'bg-gray-50'}`}>
+        {visibleMessages.map((msgIdx) => {
+          const msg = messages[msgIdx];
+          const isUser = msg.type === 'user';
+          return (
+            <div key={msgIdx} className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
+              <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                isUser 
+                  ? 'bg-gradient-to-br from-prime-500 to-prime-600 text-white rounded-br-md shadow-lg shadow-prime-500/20'
+                  : isDarkMode
+                    ? 'bg-white/10 text-white rounded-bl-md border border-white/5'
+                    : 'bg-white text-gray-900 rounded-bl-md border border-black/5 shadow-md'
+              }`}>
+                <p className="text-xs font-medium leading-relaxed">{msg.text}</p>
+                <p className={`text-[8px] mt-1.5 ${isUser ? 'text-white/60' : 'text-gray-500'}`}>{msg.time}</p>
               </div>
             </div>
-          )}
+          );
+        })}
+        {isTyping && (
+          <div className="flex justify-start animate-in fade-in duration-200">
+            <div className={`px-4 py-3 rounded-2xl rounded-bl-md ${isDarkMode ? 'bg-white/10' : 'bg-white border border-black/5'}`}>
+              <div className="flex gap-1">
+                <div className="w-2 h-2 bg-prime-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 bg-prime-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 bg-prime-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer Stats */}
+      <div className={`p-4 border-t flex items-center justify-between ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white border-black/5'}`}>
+        <div className="flex items-center gap-2">
+          <Clock size={12} className="text-prime-500" />
+          <span className="text-[9px] font-black text-prime-500 uppercase tracking-wider">Avg Response: 0.3s</span>
         </div>
-        <div className="mt-12 flex items-center justify-center gap-4 border-t border-white/[0.03] pt-8 opacity-40">
-           <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-           <span className="text-[9px] font-black uppercase tracking-[0.4em]">Live Conversation Stream</span>
+        <div className="flex items-center gap-2">
+          <CheckCircle2 size={12} className="text-green-500" />
+          <span className="text-[9px] font-black text-green-500 uppercase tracking-wider">99.8% Accuracy</span>
         </div>
       </div>
     </div>
   );
 };
 
-const BrandStoryteller = ({ isDarkMode }) => (
-  <section id="storyteller" className="reveal-section max-w-4xl mx-auto px-6 mb-40 text-center">
-    <div className={`p-12 md:p-20 rounded-[4rem] border relative overflow-hidden ${isDarkMode ? 'bg-prime-500/[0.03] border-prime-500/10' : 'bg-white border-black/5 shadow-2xl'}`}>
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-1 bg-gradient-to-r from-transparent via-prime-500 to-transparent opacity-20" />
-      <Sparkles className="text-prime-500 mx-auto mb-8 opacity-50" size={32} />
-      <p className={`text-xl md:text-2xl font-medium leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-        "একটি সফল ব্র্যান্ডের সার্থকতা লুকিয়ে থাকে তার কাস্টমারের আস্থায়। কিন্তু ইনবক্সে যখন মেসেজের পাহাড় জমে আর রিপ্লাই দিতে দেরি হয়, তখন আপনি শুধু একজন কাস্টমারই হারান না, বরং হারান আপনার ব্র্যান্ডের বিশ্বাসযোগ্যতা। মেটা সলিউশন আপনার ব্যবসার সেই না বলা কথাগুলো বোঝে। এটি কেবল একটি সফটওয়্যার নয়, বরং আপনার ব্র্যান্ডের জন্য এক অদম্য ডিজিটাল রিপ্রেজেন্টেটিভ—যা কাস্টমারের সাথে কথা বলে আপনার মতোই আপন করে, কাজ করে মেশিনের গতিতে। বাংলিশ হোক বা শুদ্ধ বাংলা, সব বুঝে নিয়ে এটি উত্তর দেয় চোখের পলকে। এতে করে আপনি যখন বড় কোনো ব্যবসায়িক মিটিংয়ে বা গভীর ঘুমে, তখনও আপনার সেলস ইউনিট থাকে সচল। এখন ইনবক্সের প্রতিটি মেসেজ হবে আপনার নতুন আয়ের উৎস।"
-      </p>
-    </div>
-  </section>
-);
+// --- Pricing Card ---
+const PricingCard = ({ tier, price, features, isPopular, isDarkMode, badge }) => {
+  const [isHovered, setIsHovered] = useState(false);
 
+  return (
+    <div
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className={`relative rounded-3xl p-8 transition-all duration-500 border ${
+        isPopular
+          ? 'bg-gradient-to-br from-prime-500/20 via-indigo-500/20 to-prime-500/20 border-prime-500/50 shadow-2xl shadow-prime-500/20 scale-105'
+          : isDarkMode
+            ? 'bg-white/5 border-white/10 hover:border-prime-500/30'
+            : 'bg-white border-black/10 hover:border-prime-500/30 shadow-lg'
+      } ${isHovered ? 'scale-105' : ''}`}
+    >
+      {badge && (
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-gradient-to-r from-prime-500 to-indigo-500 rounded-full shadow-lg">
+          <span className="text-[9px] font-black text-white uppercase tracking-widest">{badge}</span>
+        </div>
+      )}
+
+      <div className="text-center mb-6">
+        <div className="flex items-center justify-center gap-2 mb-3">
+          {tier === 'Starter' && <Rocket size={20} className="text-blue-500" />}
+          {tier === 'Pro' && <Star size={20} className="text-prime-500" />}
+          {tier === 'Elite' && <Crown size={20} className="text-purple-500" />}
+          {tier === 'God Mode' && <Sparkles size={20} className="text-amber-500" />}
+          <h3 className={`text-2xl font-black ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{tier}</h3>
+        </div>
+        <div className="flex items-baseline justify-center gap-1">
+          <span className={`text-5xl font-black ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>৳{price}</span>
+          <span className="text-sm font-bold text-gray-500">/mo</span>
+        </div>
+      </div>
+
+      <ul className="space-y-3 mb-8">
+        {features.map((feature, i) => (
+          <li key={i} className="flex items-start gap-2">
+            <Check size={14} className="text-green-500 shrink-0 mt-0.5" />
+            <span className={`text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{feature}</span>
+          </li>
+        ))}
+      </ul>
+
+      <button className={`w-full py-4 rounded-2xl font-black uppercase tracking-wider text-xs transition-all ${
+        isPopular
+          ? 'bg-gradient-to-r from-prime-500 to-indigo-500 text-white shadow-lg hover:shadow-xl hover:scale-105'
+          : isDarkMode
+            ? 'bg-white/10 text-white hover:bg-prime-500/20'
+            : 'bg-gray-900 text-white hover:bg-prime-500'
+      }`}>
+        Get Started
+      </button>
+    </div>
+  );
+};
+
+// --- Main AuthView ---
 const AuthView = ({ onAuthSuccess, isDarkMode }) => {
   const { registerBrand } = useBrand();
   const [isLogin, setIsLogin] = useState(true);
@@ -145,151 +201,317 @@ const AuthView = ({ onAuthSuccess, isDarkMode }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const revealed = useScrollReveal();
+
+  const { count: usersCount, ref: usersRef } = useAnimatedCounter(12847, 2500);
+  const { count: revenueCount, ref: revenueRef } = useAnimatedCounter(50, 2000);
+  const { count: messagesCount, ref: messagesRef } = useAnimatedCounter(2, 1500);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
       if (!isLogin && brandName) {
-        onAuthSuccess({ email, brandName }); await registerBrand(brandName);
+        onAuthSuccess({ email, brandName });
+        await registerBrand(brandName);
       } else {
         onAuthSuccess({ email, brandName: 'Default Brand' });
       }
-    } catch (err) { console.error(err); } finally { setLoading(false); }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const isRevealed = (id) => revealed.includes(id);
+  const pricingTiers = [
+    {
+      tier: 'Starter',
+      price: '0',
+      features: ['1 Brand', '100 Auto-Replies/mo', 'Basic Analytics', 'Email Support', 'Standard Response Time'],
+      badge: null,
+    },
+    {
+      tier: 'Pro',
+      price: '2,999',
+      features: ['3 Brands', 'Unlimited Auto-Replies', 'Advanced Analytics', 'Priority Support', 'AI Learning Mode', 'Custom Branding'],
+      badge: 'MOST POPULAR',
+      isPopular: true,
+    },
+    {
+      tier: 'Elite',
+      price: '9,999',
+      features: ['10 Brands', 'Everything in Pro', 'WhatsApp Integration', 'Instagram DM Auto', 'Vector Search AI', 'Team Collaboration', 'API Access'],
+      badge: 'BEST VALUE',
+    },
+    {
+      tier: 'God Mode',
+      price: '24,999',
+      features: ['Unlimited Brands', 'Everything in Elite', 'Dedicated Account Manager', 'Custom AI Training', 'White-Label Solution', '24/7 Phone Support', 'SLA Guarantee'],
+      badge: 'ULTIMATE',
+    },
+  ];
 
   return (
     <div className={`min-h-screen relative overflow-x-hidden ${isDarkMode ? 'bg-[#020617] text-white' : 'bg-slate-50 text-gray-900'}`}>
+      {/* Background Effects */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-prime-600/[0.05] blur-[150px] rounded-full animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-indigo-600/[0.05] blur-[150px] rounded-full animate-pulse" />
+        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-prime-600/[0.08] blur-[150px] rounded-full animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-indigo-600/[0.08] blur-[150px] rounded-full animate-pulse" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40%] h-[40%] bg-purple-600/[0.05] blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '1s' }} />
       </div>
 
-      <header className={`fixed top-0 left-0 right-0 z-[100] px-8 py-6 transition-all border-b border-transparent ${isDarkMode ? 'bg-[#020617]/40 border-white/[0.05] backdrop-blur-2xl' : 'bg-white/70 border-black/[0.02] backdrop-blur-xl'}`}>
+      {/* Header */}
+      <header className={`fixed top-0 left-0 right-0 z-[100] px-8 py-4 transition-all border-b border-transparent ${isDarkMode ? 'bg-[#020617]/60 border-white/[0.05] backdrop-blur-2xl' : 'bg-white/80 border-black/[0.02] backdrop-blur-xl'}`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-prime-500 rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(35,166,240,0.3)]">
-              <Cpu className="text-white" size={24} />
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-prime-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-prime-500/30">
+              <Cpu className="text-white" size={20} />
             </div>
             <div>
-              <h1 className="text-sm md:text-base font-black tracking-[0.3em] uppercase leading-none">META <span className="text-prime-500">BIZ</span></h1>
-              <span className="text-[9px] font-bold uppercase tracking-widest text-gray-500 mt-1">Growth Engine</span>
+              <h1 className="text-sm font-black tracking-[0.2em] uppercase leading-none">META <span className="text-prime-500">SOLUTION</span></h1>
+              <span className="text-[8px] font-bold uppercase tracking-widest text-gray-500">Business Automation Engine</span>
             </div>
           </div>
-          <div className="flex items-center gap-8">
-            <button onClick={() => document.getElementById('auth-gateway').scrollIntoView({ behavior: 'smooth' })} className="hidden md:block text-[10px] font-black uppercase tracking-widest opacity-60 hover:opacity-100 transition-opacity pointer-events-auto">Login</button>
-            <button onClick={() => document.getElementById('auth-gateway').scrollIntoView({ behavior: 'smooth' })} className="relative px-8 py-3 bg-prime-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]">LAUNCH</button>
-          </div>
+          <button
+            onClick={() => document.getElementById('auth-form')?.scrollIntoView({ behavior: 'smooth' })}
+            className="px-6 py-2.5 bg-gradient-to-r from-prime-500 to-indigo-500 text-white rounded-xl text-[9px] font-black uppercase tracking-wider shadow-lg hover:shadow-xl hover:scale-105 transition-all"
+          >
+            Start Free Trial
+          </button>
         </div>
       </header>
 
-      <section id="hero-simulation" className="relative pt-40 pb-4 px-6 flex flex-col items-center justify-center text-center">
-         <div className="max-w-5xl w-full">
-            <SectionHeader 
-               title="Autopilot Experience" 
-               desc={
-                 <div className="space-y-4">
-                   <p className="font-black text-prime-400 text-xl md:text-2xl tracking-tight">আপনার ব্যবসার প্রতিটি পদক্ষেপ হবে এবার অটোপাইলট মুডে।</p>
-                   <p className="opacity-80 font-bold">আপনি যখন গভীর ঘুমে, তখনও আপনার সেলস চলবে পুরোদমে।</p>
-                 </div>
-               } 
-               isDarkMode={isDarkMode} 
-               center 
-            />
-            <div className={`mt-8 p-10 md:p-16 rounded-[4.5rem] border ${isDarkMode ? 'bg-white/[0.02] border-white/5' : 'bg-white border-black/5 shadow-2xl'}`}>
-                <LiveAutoReplySlider isDarkMode={isDarkMode} />
-            </div>
-         </div>
-      </section>
+      {/* Hero Section */}
+      <section className="relative pt-32 pb-16 px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Left Content */}
+            <div className="space-y-8">
+              <div className="space-y-4">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-prime-500/10 border border-prime-500/20">
+                  <Zap size={14} className="text-prime-500" />
+                  <span className="text-[9px] font-black text-prime-500 uppercase tracking-widest">AI-Powered Automation</span>
+                </div>
+                <h1 className={`text-5xl md:text-7xl font-black leading-tight tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Automate Your
+                  <span className="block text-transparent bg-clip-text bg-gradient-to-r from-prime-400 via-indigo-400 to-prime-500">Business Growth</span>
+                </h1>
+                <p className={`text-lg font-medium leading-relaxed ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  ২৪/৭ অটোমেটেড ইনবক্স ম্যানেজমেন্ট। কাস্টমার মেসেজের উত্তর দিন চোখের পলকে, সেলস বাড়ান automatcially।
+                </p>
+              </div>
 
-      <section id="scaling-hero" className="relative py-24 px-6 flex flex-col items-center justify-center text-center">
-        <div className="max-w-5xl space-y-8">
-           <h2 className="text-5xl md:text-8xl font-black leading-[1.1] tracking-tighter">Scaling without<br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-prime-400 via-indigo-400 to-prime-400">friction</span>.</h2>
-           <div className="space-y-3">
-             <p className="text-lg md:text-2xl font-black text-prime-500/90 tracking-tight">কাস্টমারের ইনবক্সে আর কখনো দেরি নয়।</p>
-             <p className={`text-xs md:text-lg leading-relaxed max-w-2xl mx-auto font-bold opacity-60 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-               আমাদের স্মার্ট ইঞ্জিন ইনবক্স সামলাবে ঠিক আপনার মতোই, কিন্তু চোখের পলকে।
-             </p>
-           </div>
+              {/* Stats */}
+              <div ref={usersRef} className="grid grid-cols-3 gap-6">
+                <div className="text-center">
+                  <div className={`text-3xl font-black ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{usersCount.toLocaleString()}+</div>
+                  <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mt-1">Active Users</div>
+                </div>
+                <div ref={revenueRef} className="text-center">
+                  <div className={`text-3xl font-black ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>৳{revenueCount}M+</div>
+                  <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mt-1">Revenue Generated</div>
+                </div>
+                <div ref={messagesRef} className="text-center">
+                  <div className={`text-3xl font-black ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{messagesCount}M+</div>
+                  <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mt-1">Messages Handled</div>
+                </div>
+              </div>
+
+              {/* CTA Buttons */}
+              <div className="flex gap-4">
+                <button
+                  onClick={() => document.getElementById('auth-form')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="flex-1 py-4 px-8 bg-gradient-to-r from-prime-500 to-indigo-500 text-white rounded-2xl font-black uppercase tracking-wider text-sm shadow-xl hover:shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-2"
+                >
+                  Start Free Trial <ArrowRight size={16} />
+                </button>
+                <button className={`px-8 py-4 rounded-2xl font-black uppercase tracking-wider text-sm border transition-all ${isDarkMode ? 'border-white/20 text-white hover:bg-white/10' : 'border-black/20 text-gray-900 hover:bg-gray-100'}`}>
+                  Watch Demo
+                </button>
+              </div>
+            </div>
+
+            {/* Right - Live Chat Demo */}
+            <div className="relative">
+              <LiveChatDemo isDarkMode={isDarkMode} />
+              {/* Floating badges */}
+              <div className={`absolute -top-4 -right-4 px-4 py-2 rounded-2xl shadow-lg animate-bounce ${isDarkMode ? 'bg-green-500/20 border border-green-500/30' : 'bg-green-100 border border-green-200'}`}>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={14} className="text-green-500" />
+                  <span className="text-[9px] font-black text-green-500 uppercase tracking-wider">Auto-Replying...</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section id="value-demographic" className={`reveal-section max-w-7xl mx-auto px-6 mb-40 transition-all duration-1000 ${isRevealed('value-demographic') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}>
-         <div className="text-center mb-20">
-            <h3 className="text-3xl md:text-5xl font-black mb-6 tracking-tight">How your brand <span className="text-prime-500">wins</span>.</h3>
-            <p className="text-sm md:text-lg font-bold text-gray-500 max-w-2xl mx-auto">আমাদের ইঞ্জিন আপনার ব্যবসাকে করে তোলে নিরবচ্ছিন্ন এবং স্মার্ট।</p>
-         </div>
+      {/* Features Section */}
+      <section className="py-20 px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16 space-y-4">
+            <h2 className={`text-4xl md:text-6xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+              Why Choose <span className="text-prime-500">MetaSolution</span>?
+            </h2>
+            <p className={`text-lg font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              আপনার ব্যবসাকে নিয়ে যান অটোমেশনের পরবর্তী পর্যায়ে
+            </p>
+          </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-2 gap-4 md:gap-8 mb-24 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
-              { title: 'ইনবক্স অটোমেশন', desc: 'সহজ কথায় সব বুঝবে, দারুণ ভাবে উত্তর দেবে। কাস্টমারও হবে খুশি আমাদের এই স্মার্ট ইনবক্স ফিচারের সাথে।', icon: MessageSquare, color: 'prime' },
-              { title: 'স্মার্ট সেলস', desc: 'আপনি যখন অন্য কাজে ব্যস্ত বা গভীর ঘুমে, তখনও আপনার সেলস চলবে পুরোদমে। কোনো কাস্টমারই আর অর্ডার না করে যাবে না।', icon: TrendingUp, color: 'indigo' }
-            ].map((item, i) => (
-              <div key={i} className={`group p-6 md:p-12 rounded-[2.5rem] md:rounded-[4.5rem] border transition-all duration-500 hover:scale-[1.02] ${isDarkMode ? 'bg-white/[0.02] border-white/10 shadow-3xl' : 'bg-white border-black/5 shadow-xl'}`}>
-                 <div className="flex flex-col md:flex-row items-center md:items-start gap-4 md:gap-6 text-center md:text-left">
-                    <div className={`p-4 md:p-5 rounded-2xl text-white shadow-xl ${item.color === 'prime' ? 'bg-prime-500 shadow-prime-500/20' : 'bg-indigo-500 shadow-indigo-500/20'}`}><item.icon size={28} className="md:w-8 md:h-8" /></div>
-                    <h3 className="text-lg md:text-3xl font-black tracking-tight">{item.title}</h3>
-                 </div>
-                 <p className="mt-6 md:mt-8 text-[10px] md:text-base font-medium opacity-70 leading-relaxed">{item.desc}</p>
+              { icon: MessageSquare, title: 'Smart Inbox', desc: 'বাংলা, বাংলিশ, English - সব ভাষায় auto-reply', color: 'from-blue-500 to-blue-600' },
+              { icon: Zap, title: 'Instant Response', desc: '0.3 সেকেন্ডে reply, কাস্টমার পাবে না waiting', color: 'from-prime-500 to-prime-600' },
+              { icon: TrendingUp, title: 'Sales Automation', desc: 'Order থেকে delivery - সব automated', color: 'from-green-500 to-green-600' },
+              { icon: Shield, title: 'Enterprise Security', desc: 'Bank-level encryption, 100% data safe', color: 'from-purple-500 to-purple-600' },
+              { icon: BarChart3, title: 'Real-time Analytics', desc: 'Track conversions, revenue, performance', color: 'from-amber-500 to-amber-600' },
+              { icon: Users, title: 'Team Collaboration', desc: 'Multiple admins, role-based access', color: 'from-pink-500 to-pink-600' },
+            ].map((feature, i) => (
+              <div key={i} className={`group p-8 rounded-3xl border transition-all duration-500 hover:scale-105 ${isDarkMode ? 'bg-white/5 border-white/10 hover:border-prime-500/30' : 'bg-white border-black/10 hover:border-prime-500/30 shadow-lg'}`}>
+                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform`}>
+                  <feature.icon size={24} className="text-white" />
+                </div>
+                <h3 className={`text-xl font-black mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{feature.title}</h3>
+                <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{feature.desc}</p>
               </div>
             ))}
-         </div>
+          </div>
+        </div>
+      </section>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {[
-              { title: 'অফুরন্ত ধৈর্য্য', tag: 'Infinite Energy', desc: 'মানুষের ক্লান্তি আছে, কিন্তু আমাদের ইঞ্জিনের নেই। দিনে-রাতে হাজার হাজার কাস্টমারকে সার্ভিস দিতে এটি সর্বদা প্রস্তুত।', icon: Cpu, color: 'prime' },
-              { title: 'ইমোশনাল ইন্টেলিজেন্স', tag: 'Heartbeat Engine', desc: 'কাস্টমারের ভাষা এবং মুড বুঝে উত্তর দেয়। এটি কথা বলে ঠিক আপনার সেরা সেলসপার্সনের মতো।', icon: Sparkles, color: 'prime' },
-              { title: 'সফল কনভার্সন', tag: 'Direct Growth', desc: 'এটি কাস্টমারকে পেমেন্ট লিঙ্ক পাঠানো এবং অর্ডার কনফার্ম করা পর্যন্ত প্রতিটি ধাপ নিজে থেকেই সম্পন্ন করে।', icon: TrendingUp, color: 'indigo' }
-            ].map((item, i) => (
-              <div key={i} className={`group p-10 rounded-[4rem] border transition-all duration-500 hover:scale-[1.02] ${isDarkMode ? 'bg-white/[0.02] border-white/5 shadow-2xl' : 'bg-white border-black/5 shadow-xl'}`}>
-                 <div className={`mb-8 w-16 h-16 rounded-3xl flex items-center justify-center transition-transform group-hover:rotate-6 ${item.color === 'prime' ? 'bg-prime-500/10 text-prime-500' : 'bg-indigo-500/10 text-indigo-500'}`}>
-                    <item.icon size={32} />
-                 </div>
-                 <div className="space-y-4">
-                    <h4 className="text-2xl md:text-3xl font-black tracking-tight">{item.title}</h4>
-                    <p className={`text-[11px] font-bold uppercase tracking-widest ${item.color === 'prime' ? 'text-prime-400' : 'text-indigo-400'}`}>{item.tag}</p>
-                    <p className="text-sm md:text-base font-medium leading-relaxed opacity-80">{item.desc}</p>
-                 </div>
-              </div>
+      {/* Pricing Section */}
+      <section className="py-20 px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16 space-y-4">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-prime-500/10 border border-prime-500/20">
+              <Crown size={14} className="text-prime-500" />
+              <span className="text-[9px] font-black text-prime-500 uppercase tracking-widest">Choose Your Plan</span>
+            </div>
+            <h2 className={`text-4xl md:text-6xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+              Simple, Transparent <span className="text-prime-500">Pricing</span>
+            </h2>
+            <p className={`text-lg font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Start free, scale as you grow. No hidden fees.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {pricingTiers.map((tier, i) => (
+              <PricingCard key={i} {...tier} isDarkMode={isDarkMode} />
             ))}
-         </div>
+          </div>
+        </div>
       </section>
 
-      <BrandStoryteller isDarkMode={isDarkMode} />
+      {/* Auth Form Section */}
+      <section id="auth-form" className="py-20 px-6">
+        <div className="max-w-xl mx-auto">
+          <div className={`p-10 md:p-12 rounded-[2.5rem] border shadow-2xl ${isDarkMode ? 'bg-[#0a0f1d]/80 border-white/10 backdrop-blur-xl' : 'bg-white border-black/10'}`}>
+            <div className="text-center mb-8 space-y-2">
+              <h2 className={`text-3xl font-black ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                {isLogin ? 'Welcome Back' : 'Start Your Journey'}
+              </h2>
+              <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                {isLogin ? 'আপনার অ্যাকাউন্টে লগইন করুন' : '14-day free trial, no credit card required'}
+              </p>
+            </div>
 
-      <section id="auth-gateway" className="max-w-xl mx-auto px-6 pb-40">
-         <form onSubmit={handleSubmit} className={`p-10 md:p-14 rounded-[4rem] border transition-all duration-500 ${isDarkMode ? 'bg-[#0a0f1d]/60 border-white/10 shadow-3xl' : 'bg-white border-black/5 shadow-2xl'}`}>
-            <div className="text-center mb-12">
-               <h2 className="text-3xl font-black mb-3">Access Portal</h2>
-               <p className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-500 opacity-60">আপনার ব্র্যান্ডে প্রবেশ করুন</p>
-            </div>
-            <div className="space-y-6">
-               <div className="space-y-2">
-                  <label className="text-[9px] font-black uppercase tracking-widest text-prime-500 ml-4">Command Center</label>
-                  <input type="text" required placeholder="Brand Identity" className="w-full p-6 rounded-3xl bg-white/[0.03] border border-white/10 outline-none focus:border-prime-500/50 transition-all font-bold placeholder:opacity-30" value={brandName} onChange={e => setBrandName(e.target.value)} />
-               </div>
-               <div className="space-y-2">
-                  <label className="text-[9px] font-black uppercase tracking-widest text-prime-500 ml-4">Secure Channel</label>
-                  <input type="email" required placeholder="Operational Email" className="w-full p-6 rounded-3xl bg-white/[0.03] border border-white/10 outline-none focus:border-prime-500/50 transition-all font-bold placeholder:opacity-30" value={email} onChange={e => setEmail(e.target.value)} />
-               </div>
-               <div className="space-y-2">
-                  <label className="text-[9px] font-black uppercase tracking-widest text-prime-500 ml-4">Auth Key</label>
-                  <input type="password" required placeholder="••••••••" className="w-full p-6 rounded-3xl bg-white/[0.03] border border-white/10 outline-none focus:border-prime-500/50 transition-all font-bold tracking-widest" value={password} onChange={e => setPassword(e.target.value)} />
-               </div>
-               <button type="submit" className="w-full py-6 mt-4 rounded-3xl bg-prime-500 text-white font-black uppercase tracking-[0.3em] shadow-[0_20px_40px_rgba(35,166,240,0.3)] hover:scale-[1.02] transition-transform active:scale-95">
-                  {loading ? 'INITIALIZING...' : (isLogin ? 'ENTER COMMAND' : 'INITIALIZE')}
-               </button>
-               <div className="text-center pt-6">
-                  <button type="button" onClick={() => setIsLogin(!isLogin)} className="text-[10px] font-black uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity">
-                     {isLogin ? 'Create Brand Identity' : 'Already have an Engine?'}
-                  </button>
-               </div>
-            </div>
-         </form>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {!isLogin && (
+                <div className="space-y-2">
+                  <label className={`text-[9px] font-black uppercase tracking-widest ml-2 ${isDarkMode ? 'text-prime-500' : 'text-prime-600'}`}>Brand Name</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Your Brand"
+                    className={`w-full p-4 rounded-2xl border outline-none transition-all font-medium ${isDarkMode ? 'bg-white/5 border-white/10 focus:border-prime-500 text-white placeholder-gray-500' : 'bg-gray-50 border-black/10 focus:border-prime-500 text-gray-900 placeholder-gray-400'}`}
+                    value={brandName}
+                    onChange={e => setBrandName(e.target.value)}
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className={`text-[9px] font-black uppercase tracking-widest ml-2 ${isDarkMode ? 'text-prime-500' : 'text-prime-600'}`}>Email Address</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="you@company.com"
+                  className={`w-full p-4 rounded-2xl border outline-none transition-all font-medium ${isDarkMode ? 'bg-white/5 border-white/10 focus:border-prime-500 text-white placeholder-gray-500' : 'bg-gray-50 border-black/10 focus:border-prime-500 text-gray-900 placeholder-gray-400'}`}
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={`text-[9px] font-black uppercase tracking-widest ml-2 ${isDarkMode ? 'text-prime-500' : 'text-prime-600'}`}>Password</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  className={`w-full p-4 rounded-2xl border outline-none transition-all font-medium ${isDarkMode ? 'bg-white/5 border-white/10 focus:border-prime-500 text-white placeholder-gray-500' : 'bg-gray-50 border-black/10 focus:border-prime-500 text-gray-900 placeholder-gray-400'}`}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-4 mt-2 bg-gradient-to-r from-prime-500 to-indigo-500 text-white rounded-2xl font-black uppercase tracking-wider text-sm shadow-xl hover:shadow-2xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Processing...
+                  </span>
+                ) : isLogin ? (
+                  'Login to Dashboard'
+                ) : (
+                  'Start Free Trial'
+                )}
+              </button>
+
+              <div className="text-center pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsLogin(!isLogin)}
+                  className={`text-xs font-bold transition-colors ${isDarkMode ? 'text-gray-400 hover:text-prime-500' : 'text-gray-600 hover:text-prime-500'}`}
+                >
+                  {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Login'}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Quick Access */}
+          <div className="mt-6">
+            <button
+              onClick={() => {
+                const userData = { email: 'riajfreelance@gmail.com', brandName: 'Skinzy' };
+                localStorage.setItem('anzaar_user', JSON.stringify(userData));
+                onAuthSuccess(userData);
+              }}
+              className={`w-full py-3 rounded-2xl border font-black uppercase tracking-wider text-[9px] transition-all ${isDarkMode ? 'border-prime-500/30 text-prime-400 hover:bg-prime-500/10' : 'border-prime-500/30 text-prime-600 hover:bg-prime-50'}`}
+            >
+              ⚡ Quick Access — Admin Demo
+            </button>
+          </div>
+        </div>
       </section>
+
+      {/* Footer */}
+      <footer className={`py-12 px-6 border-t ${isDarkMode ? 'border-white/5' : 'border-black/5'}`}>
+        <div className="max-w-7xl mx-auto text-center space-y-4">
+          <div className="flex items-center justify-center gap-2">
+            <Cpu size={16} className="text-prime-500" />
+            <span className="text-sm font-black tracking-wider uppercase">MetaSolution</span>
+          </div>
+          <p className={`text-xs font-medium ${isDarkMode ? 'text-gray-500' : 'text-gray-600'}`}>
+            © 2026 MetaSolution. All rights reserved. Built with ❤️ in Bangladesh.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 };

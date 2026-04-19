@@ -227,7 +227,7 @@ const DraftCenter = ({
         <div>
           <h1 className={`text-2xl font-bold flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
             <Layers className="w-8 h-8 text-indigo-500" />
-            Meta Growth: Draft Center
+            Meta Growth: Draft Center {brandData?.name ? `(${brandData.name.toUpperCase()})` : ''}
             <span className="text-xs font-normal px-2 py-1 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
               Peak Intelligence
             </span>
@@ -316,11 +316,12 @@ const DraftCenter = ({
         <div className="flex items-center gap-1 p-1 bg-white/5 border border-white/5 rounded-2xl">
            <button 
              onClick={() => setActiveTab('approved')}
-             className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+             className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${
                activeTab === 'approved' ? 'bg-prime-500 text-white shadow-lg shadow-prime-500/20' : 'text-gray-500 hover:text-gray-300'
              }`}
            >
              Active Rules
+             <span className="ml-1 px-1.5 py-0.5 rounded-full bg-white/20 text-white text-[8px] font-bold">{drafts.filter(d => d.status === 'approved' || !d.status).length}</span>
            </button>
            <button 
              onClick={() => setActiveTab('pending')}
@@ -410,15 +411,26 @@ const DraftCenter = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {drafts.filter(d => d.status === activeTab).length === 0 ? (
+            {drafts.filter(d => {
+              if (activeTab === 'approved') return d.status === 'approved' || !d.status;
+              if (activeTab === 'pending') return d.status === 'pending';
+              if (activeTab === 'history') return d.status === 'history';
+              return true;
+            }).length === 0 ? (
               <tr>
                 <td colSpan="6" className="p-12 text-center text-gray-500">
                   <MessageSquare size={32} className="mx-auto mb-3 opacity-20" />
-                  No {activeTab} drafts found.
+                  No {activeTab === 'approved' ? 'approved' : activeTab === 'pending' ? 'pending' : 'history'} drafts found.
+                  {activeTab === 'pending' && ' Pending drafts are created when AI generates responses or moderators reply to conversations.'}
                 </td>
               </tr>
             ) : (
-              drafts.filter(d => d.status === activeTab).map((draft) => (
+              drafts.filter(d => {
+                if (activeTab === 'approved') return d.status === 'approved' || !d.status;
+                if (activeTab === 'pending') return d.status === 'pending';
+                if (activeTab === 'history') return d.status === 'history';
+                return true;
+              }).map((draft) => (
                 <tr 
                   key={draft.id} 
                   onClick={() => setSelectedDetailDraft(draft)}

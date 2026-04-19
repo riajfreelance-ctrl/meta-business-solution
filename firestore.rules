@@ -31,13 +31,35 @@ service cloud.firestore {
     }
 
     match /draft_replies/{draftId} {
-      allow read, write: if belongsToBrand(request.resource.data.brandId || resource.data.brandId);
+      allow read: if true;
+      allow write: if belongsToBrand(request.resource.data.brandId || resource.data.brandId);
     }
 
     match /knowledge_gaps/{gapId} {
-      allow read, write: if belongsToBrand(request.resource.data.brandId || resource.data.brandId);
+      allow read: if true;
+      allow write: if belongsToBrand(request.resource.data.brandId || resource.data.brandId);
     }
 
+    match /orders/{orderId} {
+      allow read: if true;
+      allow write: if belongsToBrand(request.resource.data.brandId || resource.data.brandId);
+    }
+
+    match /comment_drafts/{draftId} {
+      allow read: if true;
+      allow write: if belongsToBrand(request.resource.data.brandId || resource.data.brandId);
+    }
+
+    match /pending_comments/{commentId} {
+      allow read: if true;
+      allow write: if belongsToBrand(request.resource.data.brandId || resource.data.brandId);
+    }
+
+    match /media_items/{mediaId} {
+      allow read: if true;
+      allow write: if belongsToBrand(request.resource.data.brandId || resource.data.brandId);
+    }
+    
     match /draft_orders/{orderId} {
       allow read, write: if belongsToBrand(request.resource.data.brandId || resource.data.brandId);
     }

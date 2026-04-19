@@ -8,6 +8,24 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Noto+Sans+Bengali:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    
+    <!-- Fix for Firebase Firestore WebChannel Image() constructor crash -->
+    <script>
+      // Prevent "Failed to construct 'Image'" error from Firebase minified code
+      (function() {
+        if (typeof window !== 'undefined' && typeof window.Image === 'function') {
+          const OriginalImage = window.Image;
+          // Ensure Image can be called with or without 'new'
+          window.Image = function Image() {
+            if (new.target === undefined) {
+              return new OriginalImage();
+            }
+            return new OriginalImage();
+          };
+          window.Image.prototype = OriginalImage.prototype;
+        }
+      })();
+    </script>
   </head>
   <body class="bg-[#020617] text-white antialiased selection:bg-prime-500/30">
     <div id="root"></div>

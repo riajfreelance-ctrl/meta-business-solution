@@ -1,25 +1,51 @@
-const { imageHash } = require('image-hash');
+const sharp = require('sharp');
 const { serverLog } = require('../utils/logger');
 
 /**
  * Generate perceptual hash (pHash) from an image URL.
- * Uses 16-bit precision. Returns hex string.
+ * Uses sharp for Node.js compatibility. Returns hex string.
  */
-function generatePHash(imageUrl) {
-    return new Promise((resolve) => {
-        try {
-            imageHash(imageUrl, 16, true, (error, data) => {
-                if (error) {
-                    serverLog(`[pHash Error]: ${error.message} for URL: ${imageUrl}`);
-                    return resolve(null);
-                }
-                resolve(data);
-            });
-        } catch (err) {
-            serverLog(`[pHash Crash]: ${err.message}`);
-            resolve(null);
+async function generatePHash(imageUrl) {
+    try {
+        // Download image
+        const axios = require('axios');
+        const response = await axios.get(imageUrl, {
+            responseType: 'arraybuffer',
+            timeout: 10000
+        });
+        
+        // Resize to 32x32 and convert to grayscale
+        const { data, info } = await sharp(response.data)
+            .resize(32, 32)
+            .grayscale()
+            .raw()
+            .toBuffer({ resolveWithObject: true });
+        
+        // Calculate average pixel value
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) {
+            sum += data[i];
         }
-    });
+        const avg = sum / data.length;
+        
+        // Generate hash based on whether pixel is above/below average
+        let hash = '';
+        for (let i = 0; i < data.length; i += 4) {
+            hash += data[i] > avg ? '1' : '0';
+        }
+        
+        // Convert binary hash to hex (16 chars)
+        let hexHash = '';
+        for (let i = 0; i < hash.length; i += 4) {
+            const chunk = hash.substr(i, 4);
+            hexHash += parseInt(chunk, 2).toString(16);
+        }
+        
+        return hexHash.substr(0, 16);
+    } catch (err) {
+        serverLog(`[pHash Error]: ${err.message} for URL: ${imageUrl}`);
+        return null;
+    }
 }
 
 /**

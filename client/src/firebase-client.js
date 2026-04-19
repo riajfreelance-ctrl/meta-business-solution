@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, disableNetwork, enableIndexedDbPersistence, enableMultiTabIndexedDbPersistence } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -8,12 +8,20 @@ const firebaseConfig = {
   projectId: "advance-automation-8029e",
   storageBucket: "advance-automation-8029e.firebasestorage.app",
   messagingSenderId: "240143294821",
-  appId: "1:240143294821:web:70b101bf7192f4932d018c",
-  measurementId: "G-9KT4LQKFEX"
+  appId: "1:240143294821:web:70b101bf7192f4932d018c"
+  // Removed measurementId to disable Analytics and prevent Image() constructor crash
 };
 
+// Initialize Firebase without Analytics
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+
+// Initialize Firestore with settings to prevent WebChannel issues
+const db = getFirestore(app, {
+  // Disable persistence to avoid WebChannel Image() issues
+  // This is safer for serverless/Vercel deployments
+});
+
+export { db };
 
 let storage;
 try {
