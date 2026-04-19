@@ -9,7 +9,7 @@
     "api/index.js": {
       "memory": 1024,
       "maxDuration": 60,
-      "includeFiles": "server/firebase-service-account.json"
+      "includeFiles": "server/**"
     }
   }
 }

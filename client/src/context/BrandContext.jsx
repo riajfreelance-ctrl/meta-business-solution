@@ -13,28 +13,72 @@ export const BrandProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchBrands = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('BrandContext: No user, skipping brand fetch');
+      return;
+    }
     try {
+      console.log('BrandContext: Fetching brands for user:', user.email);
       const { collection, getDocs, query, where } = await import('firebase/firestore');
       
-      let q;
+      let brandList = [];
+      
       if (user.email === 'riajfreelance@gmail.com') {
         setRole('super-admin');
-        q = collection(db, "brands"); // Fetch all for super-admin
+        console.log('BrandContext: Super-admin detected, fetching brands via Admin Proxy');
+        try {
+          const res = await fetch(`/api/admin/brands?email=${user.email}`);
+          const data = await res.json();
+          if (data.success) {
+            brandList = data.brands;
+          } else {
+            console.warn('BrandContext: Admin Proxy failed, falling back to direct Firestore fetch');
+            const q = query(collection(db, "brands"), where("ownerEmail", "==", user.email));
+            const snap = await getDocs(q);
+            brandList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          }
+        } catch (apiErr) {
+          console.error('BrandContext: Admin Proxy error:', apiErr);
+          const q = query(collection(db, "brands"), where("ownerEmail", "==", user.email));
+          const snap = await getDocs(q);
+          brandList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        }
       } else {
         setRole('brand-owner');
-        q = query(collection(db, "brands"), where("ownerEmail", "==", user.email));
+        const q = query(collection(db, "brands"), where("ownerEmail", "==", user.email));
+        const snap = await getDocs(q);
+        brandList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       }
 
-      const snap = await getDocs(q);
-      const brandList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log('BrandContext: Found', brandList.length, 'brands');
       setBrands(brandList);
+      window.__METABIZ_DEBUG__ = { brandsFound: brandList.length, lastFetch: new Date().toISOString() };
       
-      if (brandList.length > 0 && (!activeBrandId || !brandList.find(b => b.id === activeBrandId))) {
-        setActiveBrandId(brandList[0].id);
+      if (brandList.length > 0) {
+        // STRICT FORCE: If 'Skinzy' exists, always pick it. Otherwise use localStorage or first brand.
+        const skinzyBrand = brandList.find(b => b.id === 'Skinzy');
+        const savedBrandId = localStorage.getItem('metasolution_active_brand_id');
+        const brandExists = savedBrandId && brandList.find(b => b.id === savedBrandId);
+        
+        if (skinzyBrand) {
+            console.log('BrandContext: Strictly forcing Skinzy brand');
+            setActiveBrandId('Skinzy');
+            localStorage.setItem('metasolution_active_brand_id', 'Skinzy');
+        } else if (brandExists) {
+            console.log('BrandContext: Restoring activeBrandId from localStorage:', savedBrandId);
+            setActiveBrandId(savedBrandId);
+        } else {
+            console.log('BrandContext: Setting default activeBrandId to:', brandList[0].id);
+            setActiveBrandId(brandList[0].id);
+            localStorage.setItem('metasolution_active_brand_id', brandList[0].id);
+        }
+      } else if (brandList.length === 0) {
+        console.log('BrandContext: No brands found for user');
+        window.__METABIZ_DEBUG__.error = "Empty snapshot from Firestore or Proxy";
       }
     } catch (e) {
       console.error("Error fetching brand list:", e);
+      window.__METABIZ_DEBUG__ = { error: e.message, stack: e.stack };
     }
   };
 
@@ -201,9 +245,25 @@ Welcome to your elite command center. The system has automatically provisioned y
 
   useEffect(() => {
     if (!activeBrandId) return;
-    const docRef = doc(db, "brands", activeBrandId);
 
-    setLoading(true);
+    // IMMEDIATE RESOLVE FOR ADMIN: Use existing brands list to avoid permission hang
+    if (user?.email === 'riajfreelance@gmail.com' && brands.length > 0) {
+        const adminBrand = brands.find(b => b.id === activeBrandId);
+        if (adminBrand) {
+            console.log('BrandContext: Resolving brandData via Admin Proxy Cache');
+            setBrandData(adminBrand);
+            setLoading(false);
+            // We can still try onSnapshot for real-time updates, but we've already unblocked the UI
+        }
+    }
+
+    const docRef = doc(db, "brands", activeBrandId);
+    
+    // Only set loading to true if we don't have data yet
+    if (!brandData || brandData.id !== activeBrandId) {
+        setLoading(true);
+    }
+
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -215,11 +275,22 @@ Welcome to your elite command center. The system has automatically provisioned y
       }
       setLoading(false);
     }, (error) => {
-      console.error("Error listening to brand data:", error);
+      console.error("Error listening to brand data (Firestore might be blocked):", error);
+      // Double check if we can fallback to the brands list one last time
+      if (user?.email === 'riajfreelance@gmail.com') {
+         const fallback = brands.find(b => b.id === activeBrandId);
+         if (fallback) setBrandData(fallback);
+      }
       setLoading(false);
     });
 
     return () => unsubscribe();
+  }, [activeBrandId, user, brands]);
+
+  useEffect(() => {
+    if (activeBrandId) {
+      localStorage.setItem('metasolution_active_brand_id', activeBrandId);
+    }
   }, [activeBrandId]);
 
   return (

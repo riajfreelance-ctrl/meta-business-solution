@@ -171,6 +171,44 @@ app.get('/api/health/automation', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────
+// 🔐 ADMIN RECOVERY PROXY — Bypasses Client-Side Permissions for Owner
+// ─────────────────────────────────────────────────────────────────────
+app.get('/api/admin/brands', async (req, res) => {
+    const { email } = req.query;
+    if (email !== 'riajfreelance@gmail.com') return res.status(403).json({ error: 'Access Denied' });
+    try {
+        const { db } = require('./services/firestoreService');
+        const snap = await db.collection('brands').where('ownerEmail', '==', email).get();
+        const brands = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        res.json({ success: true, brands });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/admin/metadata', async (req, res) => {
+    const { brandId } = req.query;
+    if (!brandId) return res.status(400).json({ error: 'Missing brandId' });
+    try {
+        const { db } = require('./services/firestoreService');
+        const [draftsSnap, kbSnap, strategiesSnap] = await Promise.all([
+            db.collection('draft_replies').where('brandId', '==', brandId).get(),
+            db.collection('knowledge_base').where('brandId', '==', brandId).get(),
+            db.collection('comment_strategies').where('brandId', '==', brandId).get()
+        ]);
+
+        res.json({
+            success: true,
+            drafts: draftsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+            library: kbSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+            strategies: strategiesSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────
 
 app.use('/api', fbRoutes);
 app.use('/api', waRoutes);

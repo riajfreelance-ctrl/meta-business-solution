@@ -22,7 +22,8 @@ import {
   Cpu,
   RotateCcw, Bookmark, Star, ChevronDown, Plus, Globe,
   Maximize, ZoomIn, ZoomOut, ChevronLeft, ChevronRight,
-  X, XCircle, Info, Download, ShoppingCart
+  X, XCircle, Info, Download, ShoppingCart,
+  Image
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 

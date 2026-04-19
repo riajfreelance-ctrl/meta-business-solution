@@ -292,8 +292,16 @@ const Sidebar = ({
                     )) : (
                       <p className="p-4 text-[10px] text-gray-500 text-center uppercase tracking-widest ">No other brands</p>
                     )}
+                    
+                    {/* TEMP DEBUG BADGE */}
+                    <div className="mt-4 p-2 bg-purple-500/10 border border-purple-500/20 rounded-lg text-center">
+                       <p className="text-[8px] font-black uppercase text-purple-400 tracking-widest">
+                          Debug: {brands.length} Brands • Role: {role}
+                       </p>
+                    </div>
+
                     <button 
-                      onClick={() => {
+                       onClick={() => {
                         setIsBrandSwitcherOpen(false);
                         onOpenBrandOnboarding();
                       }}

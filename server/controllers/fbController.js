@@ -1332,12 +1332,21 @@ async function processAccumulatedMessages(sender_psid, messages, brandData, plat
             
             serverLog(`[DRAFT ❌] No draft matches found`);
             
-            // AI Fallback (only if enabled)
-            if (aiEnabled && messages.length <= 2) {
-                serverLog(`[AI] Activating AI fallback for simple query`);
-                await handleAIResponse(sender_psid, combinedText, brandData);
-                return;
-            }
+            // DISABLED: AI Fallback - Using ONLY bot/draft replies
+            // if (aiEnabled && messages.length <= 2) {
+            //     serverLog(`[AI] Activating AI fallback for simple query`);
+            //     await handleAIResponse(sender_psid, combinedText, brandData);
+            //     return;
+            // }
+            
+            // No draft match - send default message or mark pending
+            serverLog(`[NO MATCH] No draft matched, marking as pending for manual reply`);
+            await db.collection('conversations').doc(sender_psid).set({ 
+                status: 'pending', 
+                isPriority: true,
+                needsHumanReply: true,
+                noDraftMatch: true
+            }, { merge: true });
         }
         
         // No reply — mark pending

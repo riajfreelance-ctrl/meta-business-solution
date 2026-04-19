@@ -4,8 +4,15 @@ const path = require('path');
 const cache = require('../utils/cache');
 require('dotenv').config();
 
-// Use path.join to ensure correct resolution in Vercel environment
-const serviceAccountPath = path.join(process.cwd(), 'server', 'firebase-service-account.json');
+// ── ROBUST PATH RESOLUTION FOR VERCEL + LOCAL ──
+// Vercel: process.cwd() = /var/task, file at /var/task/server/firebase-service-account.json
+// Local:  __dirname = .../server/services, file at .../server/firebase-service-account.json
+const possiblePaths = [
+  path.join(process.cwd(), 'server', 'firebase-service-account.json'),
+  path.join(__dirname, '..', 'firebase-service-account.json'),
+  path.join(process.cwd(), 'firebase-service-account.json'),
+  '/var/task/server/firebase-service-account.json',
+];
 let serviceAccount;
 try {
   const envKey = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON || process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -16,18 +23,24 @@ try {
       if (serviceAccount.private_key) {
         serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
       }
+      console.log('Firebase SA loaded from env var');
     } catch(parseErr) {
       console.error('Failed to parse Env JSON:', parseErr.message);
     }
-  } 
+  }
   
-  if (!serviceAccount && fs.existsSync(serviceAccountPath)) {
-    serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-  } else if (!serviceAccount) {
-    const altPath = path.join(__dirname, '..', 'firebase-service-account.json');
-    if (fs.existsSync(altPath)) {
-      serviceAccount = JSON.parse(fs.readFileSync(altPath, 'utf8'));
+  if (!serviceAccount) {
+    for (const saPath of possiblePaths) {
+      if (fs.existsSync(saPath)) {
+        serviceAccount = JSON.parse(fs.readFileSync(saPath, 'utf8'));
+        console.log('Firebase SA loaded from file:', saPath);
+        break;
+      }
     }
+  }
+  
+  if (!serviceAccount) {
+    console.error('Firebase Service Account NOT FOUND in env or any path:', possiblePaths);
   }
 } catch (e) {
   console.error('Firebase Service Account Load Error:', e.message);
