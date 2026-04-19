@@ -1222,6 +1222,12 @@ async function processThreadedMessage(sender_psid, message, brandData, platformT
 // ─── PROCESS ACCUMULATED MESSAGES ───
 async function processAccumulatedMessages(sender_psid, messages, brandData, platformType) {
     try {
+        // Extract automation settings from brandData
+        const inboxSettings = brandData.inboxSettings || {};
+        const aiSettings = brandData.aiSettings || {};
+        const systemAutoReply = inboxSettings.systemAutoReply !== false;
+        const aiEnabled = aiSettings.inboxAiEnabled !== false;
+        
         // Combine all message texts
         const combinedText = messages.map(m => m.text).filter(t => t.trim()).join(' ');
         
