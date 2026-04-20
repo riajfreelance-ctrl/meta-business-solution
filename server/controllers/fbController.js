@@ -744,15 +744,34 @@ async function getDataCenterReply(message, brandId, postId = null) {
         serverLog(`[Data Center] Brand ID: ${brandId}`);
         serverLog(`[Data Center] Post ID: ${postId}`);
 
-        // PRIORITY 1: Check if this specific post has Data Center rules (UNIVERSAL - no brand filter)
+        // PRIORITY 1: Check if this specific post has Data Center rules
         if (postId) {
             serverLog(`[Data Center] Checking post-specific rules for: ${postId}`);
+            serverLog(`[Data Center] Full post_id from webhook: ${postId}`);
+            
             const postSpecificSnap = await db.collection("comment_data_center")
                 .where("postId", "==", postId)
                 .where("isActive", "==", true)
                 .get();
 
             serverLog(`[Data Center] Post-specific rules found: ${postSpecificSnap.size}`);
+            
+            // Debug: Log all Data Center entries for this brand
+            if (postSpecificSnap.empty) {
+                serverLog(`[Data Center DEBUG] No exact match. Checking all active entries...`);
+                const allActiveSnap = await db.collection("comment_data_center")
+                    .where("isActive", "==", true)
+                    .limit(5)
+                    .get();
+                
+                if (!allActiveSnap.empty) {
+                    serverLog(`[Data Center DEBUG] Sample entries:`);
+                    allActiveSnap.docs.forEach((doc, idx) => {
+                        const data = doc.data();
+                        serverLog(`  ${idx+1}. postId=${data.postId || 'N/A'}, isGlobal=${data.isGlobal || false}, questions=${data.questions?.length || 0}`);
+                    });
+                }
+            }
 
             if (!postSpecificSnap.empty) {
                 serverLog(`[Data Center] Found post-specific rules for ${postId}`);
