@@ -347,14 +347,24 @@ async function handleWebhookPost(req, res) {
                 const platformType = isIG ? 'instagram' : 'facebook';
                 
                 serverLog(`[WEBHOOK] Entry.id: ${platformId} | Type: ${platformType}`);
+                serverLog(`[WEBHOOK] Entry keys: ${Object.keys(entry).join(', ')}`);
+                serverLog(`[WEBHOOK] Has messaging: ${!!entry.messaging}`);
+                serverLog(`[WEBHOOK] Has changes: ${!!entry.changes}`);
+                
+                if (entry.changes) {
+                    serverLog(`[WEBHOOK] Changes count: ${entry.changes.length}`);
+                    entry.changes.forEach((change, idx) => {
+                        serverLog(`[WEBHOOK] Change ${idx}: field=${change.field}, item=${change.value?.item}, verb=${change.value?.verb}`);
+                    });
+                }
                 
                 let brandData = await getBrandByPlatformId(platformId, platformType);
                 
                 // --- UNIVERSAL FALLBACK FOR SKINZY ---
                 if (!brandData) {
                     serverLog(`[WEBHOOK FALLBACK] Brand not found for id ${platformId} (${platformType}). Using Skinzy as fallback.`);
-                    // Skinzy Page ID is '963307416870090'
-                    brandData = await getBrandByPlatformId('963307416870090', 'facebook'); 
+                    // Skinzy Page ID is '61587065925121'
+                    brandData = await getBrandByPlatformId('61587065925121', 'facebook'); 
                 }
                 
                 if (!brandData) {
