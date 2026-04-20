@@ -546,8 +546,37 @@ async function processIncomingComment(commentData, brandData) {
         let matchedDraftId = null;
         let matchedIndex = null;
 
-        // A. System Keyword Match
+        // PRIORITY 1: Comment Data Center (Post-specific automation with shuffled replies)
         if (systemAutoReply) {
+            const dataCenterMatch = await getDataCenterReply(message, brandData.id, post_id);
+            if (dataCenterMatch) {
+                const { variation, dataId, index } = dataCenterMatch;
+                publicReply = variation.public;
+                privateReply = variation.private;
+                matchedVariation = variation;
+                matchedDraftId = dataId;
+                matchedIndex = index;
+                replySent = true;
+                serverLog(`[Data Center MATCH ✅] Post-specific reply found for: ${message}`);
+                
+                // Track Performance
+                const dataRef = db.collection("comment_data_center").doc(dataId);
+                const dataSnap = await dataRef.get();
+                if (dataSnap.exists) {
+                    const data = dataSnap.data();
+                    // Track which question set was matched
+                    if (data.questions && data.questions[index]) {
+                        // We'll track at the question level
+                        serverLog(`[Data Center] Tracking hit for question set ${index}`);
+                    }
+                }
+            } else {
+                serverLog(`[Data Center NO MATCH] Trying comment_drafts fallback...`);
+            }
+        }
+
+        // PRIORITY 2: Legacy Comment Drafts (if Data Center doesn't match)
+        if (!replySent && systemAutoReply) {
             const matchResult = await getShuffledReply(message, brandData.id, post_id);
             if (matchResult) {
                 const { variation, draftId, index } = matchResult;
@@ -661,13 +690,101 @@ async function processIncomingComment(commentData, brandData) {
 
         // Final Log in Firestore
         await db.collection('comments').add({
-            comment_id, post_id, sender_id, sender_name: from.name,
+            comment_id, postId: post_id, sender_id, sender_name: from.name,
             message, reply: publicReply, privateReply,
             brandId: brandData.id, timestamp: serverTimestamp()
         });
 
     } catch (error) {
         console.error("Error processing comment:", error);
+    }
+}
+
+/**
+ * DATA CENTER REPLY ENGINE
+ * Prioritizes post-specific automation with 5 shuffled replies per question
+ * This prevents Facebook blocking by ensuring variety in responses
+ * UNIVERSAL - Works for ALL brands
+ */
+async function getDataCenterReply(message, brandId, postId = null) {
+    try {
+        const lowerText = message.toLowerCase();
+        serverLog(`[Data Center] Checking for post ${postId} with message: ${message}`);
+
+        // PRIORITY 1: Check if this specific post has Data Center rules (UNIVERSAL - no brand filter)
+        if (postId) {
+            const postSpecificSnap = await db.collection("comment_data_center")
+                .where("postId", "==", postId)
+                .where("isActive", "==", true)
+                .get();
+
+            if (!postSpecificSnap.empty) {
+                serverLog(`[Data Center] Found post-specific rules for ${postId}`);
+                const doc = postSpecificSnap.docs[0];
+                const data = doc.data();
+                
+                // Try to match keywords
+                for (let i = 0; i < data.questions.length; i++) {
+                    const question = data.questions[i];
+                    const hasMatch = question.keywords.some(kw => 
+                        lowerText.includes(kw.toLowerCase())
+                    );
+
+                    if (hasMatch && question.replies && question.replies.length > 0) {
+                        // Randomly select 1 of 5 replies (shuffle)
+                        const randomIndex = Math.floor(Math.random() * question.replies.length);
+                        const variation = question.replies[randomIndex];
+                        
+                        serverLog(`[Data Center ✅] Matched question set ${i}, using reply variation ${randomIndex}`);
+                        return {
+                            variation: variation,
+                            dataId: doc.id,
+                            index: i,
+                            variationIndex: randomIndex
+                        };
+                    }
+                }
+            }
+        }
+
+        // PRIORITY 2: Check universal/global templates (UNIVERSAL - no brand filter)
+        const globalSnap = await db.collection("comment_data_center")
+            .where("isGlobal", "==", true)
+            .where("isActive", "==", true)
+            .get();
+
+        if (!globalSnap.empty) {
+            serverLog(`[Data Center] Checking universal templates...`);
+            const doc = globalSnap.docs[0];
+            const data = doc.data();
+            
+            // Try to match keywords
+            for (let i = 0; i < data.questions.length; i++) {
+                const question = data.questions[i];
+                const hasMatch = question.keywords.some(kw => 
+                    lowerText.includes(kw.toLowerCase())
+                );
+
+                if (hasMatch && question.replies && question.replies.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * question.replies.length);
+                    const variation = question.replies[randomIndex];
+                    
+                    serverLog(`[Data Center ✅ Universal] Matched global question set ${i}, using reply ${randomIndex}`);
+                    return {
+                        variation: variation,
+                        dataId: doc.id,
+                        index: i,
+                        variationIndex: randomIndex
+                    };
+                }
+            }
+        }
+
+        serverLog(`[Data Center ❌] No match found`);
+        return null;
+    } catch (error) {
+        serverLog(`[Data Center Error] ${error.message}`);
+        return null;
     }
 }
 
