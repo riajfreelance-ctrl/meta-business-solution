@@ -409,10 +409,19 @@ async function handleWebhookPost(req, res) {
 
                 if (entry.changes) {
                     for (const change of entry.changes) {
+                        serverLog(`[WEBHOOK CHANGE] Field: ${change.field}, Item: ${change.value?.item}, Verb: ${change.value?.verb}`);
+                        
                         if (brandData && change.field === 'feed' && change.value.item === 'comment' && change.value.verb === 'add') {
+                            serverLog(`[COMMENT WEBHOOK] Processing comment from: ${change.value.from?.name}, Message: ${change.value.message}`);
+                            serverLog(`[COMMENT WEBHOOK] Post ID: ${change.value.post_id}, Comment ID: ${change.value.comment_id}`);
+                            serverLog(`[COMMENT WEBHOOK] Brand: ${brandData.name} (${brandData.id})`);
+                            
                             const eventId = change.value.comment_id ? `cmt_${change.value.comment_id}` : null;
                             const cmtTask = checkIdempotencySafe(eventId).then(canProceed => {
-                                if (!canProceed) return;
+                                if (!canProceed) {
+                                    serverLog(`[COMMENT SKIP] Idempotency check failed for ${eventId}`);
+                                    return;
+                                }
                                 return trace(`${eventId}:LogicAndReply`, withTimeout(processIncomingComment(change.value, brandData), 50000, 'processComment', async () => {
                                     await db.collection("pending_comments").add({
                                         commentId: change.value.comment_id,
@@ -450,7 +459,17 @@ async function processIncomingComment(commentData, brandData) {
     const { comment_id, post_id, message, from } = commentData;
     const sender_id = from.id;
 
-    if (sender_id === brandData.facebookPageId) return;
+    serverLog(`[COMMENT PROCESS] ===== START =====`);
+    serverLog(`[COMMENT PROCESS] Comment ID: ${comment_id}`);
+    serverLog(`[COMMENT PROCESS] Post ID: ${post_id}`);
+    serverLog(`[COMMENT PROCESS] Message: ${message}`);
+    serverLog(`[COMMENT PROCESS] From: ${from.name} (${sender_id})`);
+    serverLog(`[COMMENT PROCESS] Brand: ${brandData.name} (${brandData.id})`);
+
+    if (sender_id === brandData.facebookPageId) {
+        serverLog(`[COMMENT SKIP] Comment from page itself, skipping`);
+        return;
+    }
 
     // ── DUPLICATE PREVENTION: Skip if already replied to this comment ──
     if (repliedCommentIds.has(comment_id)) {
@@ -710,14 +729,20 @@ async function processIncomingComment(commentData, brandData) {
 async function getDataCenterReply(message, brandId, postId = null) {
     try {
         const lowerText = message.toLowerCase();
-        serverLog(`[Data Center] Checking for post ${postId} with message: ${message}`);
+        serverLog(`[Data Center] ===== CHECKING =====`);
+        serverLog(`[Data Center] Message: ${message}`);
+        serverLog(`[Data Center] Brand ID: ${brandId}`);
+        serverLog(`[Data Center] Post ID: ${postId}`);
 
         // PRIORITY 1: Check if this specific post has Data Center rules (UNIVERSAL - no brand filter)
         if (postId) {
+            serverLog(`[Data Center] Checking post-specific rules for: ${postId}`);
             const postSpecificSnap = await db.collection("comment_data_center")
                 .where("postId", "==", postId)
                 .where("isActive", "==", true)
                 .get();
+
+            serverLog(`[Data Center] Post-specific rules found: ${postSpecificSnap.size}`);
 
             if (!postSpecificSnap.empty) {
                 serverLog(`[Data Center] Found post-specific rules for ${postId}`);
@@ -730,6 +755,8 @@ async function getDataCenterReply(message, brandId, postId = null) {
                     const hasMatch = question.keywords.some(kw => 
                         lowerText.includes(kw.toLowerCase())
                     );
+
+                    serverLog(`[Data Center] Question ${i}: keywords=${question.keywords.join(', ')}, match=${hasMatch}`);
 
                     if (hasMatch && question.replies && question.replies.length > 0) {
                         // Randomly select 1 of 5 replies (shuffle)
@@ -746,18 +773,24 @@ async function getDataCenterReply(message, brandId, postId = null) {
                     }
                 }
             }
+        } else {
+            serverLog(`[Data Center] No postId provided, skipping post-specific check`);
         }
 
         // PRIORITY 2: Check universal/global templates (UNIVERSAL - no brand filter)
+        serverLog(`[Data Center] Checking global templates...`);
         const globalSnap = await db.collection("comment_data_center")
             .where("isGlobal", "==", true)
             .where("isActive", "==", true)
             .get();
 
+        serverLog(`[Data Center] Global templates found: ${globalSnap.size}`);
+
         if (!globalSnap.empty) {
             serverLog(`[Data Center] Checking universal templates...`);
             const doc = globalSnap.docs[0];
             const data = doc.data();
+            serverLog(`[Data Center] Global template questions: ${data.questions?.length || 0}`);
             
             // Try to match keywords
             for (let i = 0; i < data.questions.length; i++) {
@@ -765,6 +798,8 @@ async function getDataCenterReply(message, brandId, postId = null) {
                 const hasMatch = question.keywords.some(kw => 
                     lowerText.includes(kw.toLowerCase())
                 );
+
+                serverLog(`[Data Center] Global Q${i}: keywords=${question.keywords.join(', ')}, match=${hasMatch}`);
 
                 if (hasMatch && question.replies && question.replies.length > 0) {
                     const randomIndex = Math.floor(Math.random() * question.replies.length);
@@ -779,12 +814,15 @@ async function getDataCenterReply(message, brandId, postId = null) {
                     };
                 }
             }
+        } else {
+            serverLog(`[Data Center ❌] No global templates found!`);
         }
 
         serverLog(`[Data Center ❌] No match found`);
         return null;
     } catch (error) {
         serverLog(`[Data Center Error] ${error.message}`);
+        serverLog(`[Data Center Error Stack] ${error.stack}`);
         return null;
     }
 }
