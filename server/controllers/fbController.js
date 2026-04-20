@@ -434,8 +434,14 @@ async function handleWebhookPost(req, res) {
                 }
             }
 
-            await trace('AllSettled_OuterLoop', Promise.allSettled(tasks));
+            // CRITICAL FIX: Send 200 response IMMEDIATELY to Facebook (within 5 seconds)
+            // Then process all events (messages, comments, postbacks) in background
             res.status(200).send('EVENT_RECEIVED');
+            
+            // Process in background (don't await)
+            Promise.allSettled(tasks).catch(err => {
+                serverLog(`[Background Processing Error] ${err.message}`);
+            });
         } else {
             res.sendStatus(404);
         }
