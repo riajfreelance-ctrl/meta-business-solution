@@ -363,8 +363,8 @@ async function handleWebhookPost(req, res) {
                 // --- UNIVERSAL FALLBACK FOR SKINZY ---
                 if (!brandData) {
                     serverLog(`[WEBHOOK FALLBACK] Brand not found for id ${platformId} (${platformType}). Using Skinzy as fallback.`);
-                    // Skinzy Page ID is '61587065925121'
-                    brandData = await getBrandByPlatformId('61587065925121', 'facebook'); 
+                    // Skinzy Page ID is '963307416870090'
+                    brandData = await getBrandByPlatformId('963307416870090', 'facebook'); 
                 }
                 
                 if (!brandData) {
