@@ -8,4 +8,5 @@ PRIVATE_KEYS_DO_NOT_SHARE.txt
 PRIVATE_CREDENTIALS.txt
 .vercel
 .env*.local
-# server/firebase-service-account.json — NEEDED FOR VERCEL DEPLOY (do not ignore)
+# server/firebase-service-account.json — KEEP LOCALLY FOR VERCEL DEPLOY BUT DO NOT PUSH TO GITHUB
+server/firebase-service-account.json

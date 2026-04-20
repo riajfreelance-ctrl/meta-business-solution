@@ -50,6 +50,11 @@ service cloud.firestore {
       allow write: if belongsToBrand(request.resource.data.brandId || resource.data.brandId);
     }
 
+    match /comment_data_center/{dataId} {
+      allow read: if true; // Universal access for all brands
+      allow write: if true; // Allow creating/editing automation rules
+    }
+
     match /pending_comments/{commentId} {
       allow read: if true;
       allow write: if belongsToBrand(request.resource.data.brandId || resource.data.brandId);

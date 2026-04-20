@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Firestore Test</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <h1>Firestore Connection Test</h1>
+  <div id="status">Testing...</div>
+  <pre id="output"></pre>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBfGtLofGKrYIXO8Jw1caphsuN014HHiLA",
+      authDomain: "advance-automation-8029e.firebaseapp.com",
+      projectId: "advance-automation-8029e",
+      storageBucket: "advance-automation-8029e.firebasestorage.app",
+      messagingSenderId: "240143294821",
+      appId: "1:240143294821:web:70b101bf7192f4932d018c"
+    };
+
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const status = document.getElementById('status');
+    const output = document.getElementById('output');
+
+    async function test() {
+      const start = Date.now();
+      output.textContent = 'Fetching comment_data_center...\n';
+      
+      try {
+        const snapshot = await db.collection('comment_data_center').get();
+        const elapsed = Date.now() - start;
+        
+        status.textContent = '✅ SUCCESS!';
+        status.style.color = 'green';
+        output.textContent += `\n✅ Fetched ${snapshot.size} documents in ${elapsed}ms\n\n`;
+        
+        snapshot.docs.forEach((doc, i) => {
+          const data = doc.data();
+          output.textContent += `Document ${i+1}:\n`;
+          output.textContent += `  ID: ${doc.id}\n`;
+          output.textContent += `  PostId: ${data.postId}\n`;
+          output.textContent += `  Questions: ${data.questions?.length || 0}\n`;
+          output.textContent += `  Replies: ${data.questions?.reduce((s, q) => s + q.replies.length, 0) || 0}\n\n`;
+        });
+      } catch (error) {
+        const elapsed = Date.now() - start;
+        status.textContent = '❌ FAILED!';
+        status.style.color = 'red';
+        output.textContent += `\n❌ Error after ${elapsed}ms\n`;
+        output.textContent += `Code: ${error.code}\n`;
+        output.textContent += `Message: ${error.message}\n`;
+        output.textContent += `Full: ${JSON.stringify(error, null, 2)}\n`;
+      }
+    }
+
+    test();
+  </script>
+</body>
+</html>

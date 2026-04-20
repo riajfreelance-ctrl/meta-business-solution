@@ -54,6 +54,7 @@ import KnowledgeBase from './components/Views/KnowledgeBase';
 import KnowledgeGaps from './components/Views/KnowledgeGaps';
 import DraftCenter from './components/Views/DraftCenter';
 import CommentDraftCenter from './components/Views/CommentDraftCenter';
+import CommentDataCenter from './components/Views/CommentDataCenter';
 import OrderDrafting from './components/Views/OrderDrafting';
 import OrdersView from './components/Views/OrdersView';
 import CatalogShareModal from './components/Inbox/CatalogShareModal';
@@ -447,7 +448,8 @@ const Dashboard = () => {
           isGroup: true,
           items: [
             { id: 'fb_inbox', label: 'inbox', icon: MessengerIcon },
-            { id: 'fb_comments', label: 'comments', icon: FBCommentIcon }
+            { id: 'fb_comments', label: 'comments', icon: FBCommentIcon },
+            { id: 'comment_data', label: 'data center', icon: Database }
           ]
         },
         { 
@@ -910,6 +912,13 @@ const Dashboard = () => {
                   pendingComments={pendingComments}
                   isSyncing={isSyncingHistory}
                   handleSyncHistory={syncHistory}
+                />
+              </div>
+            )}
+            {activeTab === 'comment_data' && (
+              <div className="flex-1 overflow-y-auto p-8 bg-slate-950/20">
+                <CommentDataCenter 
+                  isDarkMode={isDarkMode}
                 />
               </div>
             )}

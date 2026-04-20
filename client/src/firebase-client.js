@@ -15,11 +15,8 @@ const firebaseConfig = {
 // Initialize Firebase without Analytics
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with settings to prevent WebChannel issues
-const db = getFirestore(app, {
-  // Disable persistence to avoid WebChannel Image() issues
-  // This is safer for serverless/Vercel deployments
-});
+// Initialize Firestore
+const db = getFirestore(app);
 
 export { db };
 
