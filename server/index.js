@@ -20,6 +20,7 @@ const crmController = require('./controllers/crmController');
 const retentionController = require('./controllers/retentionController');
 const analyticsController = require('./controllers/analyticsController');
 const settingsController = require('./controllers/settingsController');
+const seedDataCenterRoutes = require('./routes/seedDataCenter');
 const { checkRole } = require('./middleware/authMiddleware');
 
 const app = express()
@@ -216,6 +217,7 @@ app.use('/api', aiRoutes);
 app.use('/api', productRoutes);
 app.use('/api', adRoutes);
 app.use('/api', crmRoutes);
+app.use('/api', seedDataCenterRoutes);
 app.get('/api/search', searchController.unifiedSearch);
 app.get('/api/retention/stats', checkRole(['admin']), retentionController.getStats);
 app.post('/api/retention/trigger', checkRole(['admin']), retentionController.triggerAutomation);
